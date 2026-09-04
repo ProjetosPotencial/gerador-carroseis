@@ -63,6 +63,7 @@ export default function TemplateIpvaIptuFeed({
               ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y })
               : undefined
           }
+          onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
         />
       ) : (
         <div
@@ -95,7 +96,7 @@ export default function TemplateIpvaIptuFeed({
 
       {/* ============ TEXTURA OVERLAY (v7.7.2) ============ */}
       <TexturaOverlay
-        visivel={slide.mostrarTextura !== false}
+        visivel={slide.mostrarTextura === true}
         opacity={slide.opacidadeTextura ?? 0.75}
         modo={slide.modoTextura ?? "overlay"}
       />

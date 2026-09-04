@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Download,
   Loader2,
@@ -20,6 +20,8 @@ import {
   Sun,
   Frame,
   MoveVertical,
+  Library,
+  UploadCloud,
 } from "lucide-react";
 import FeedSlide, {
   TEMPLATES_DISPONIVEIS,
@@ -32,13 +34,16 @@ import {
   type TipoRodape,
   PARCELE_AQUI_CORES,
 } from "./templates/tipos";
-import { baixarCarrosselZIP, baixarSlideUnico } from "../../lib/gerarCarrossel";
+import { baixarCarrosselZIP, baixarSlideUnico, gerarSlideDataURL } from "../../lib/gerarCarrossel";
 import {
   parsearTextoFeedStories,
   EXEMPLO_TEXTO_COLA,
 } from "../../lib/parsearTextoFeed";
 import UnsplashSearch from "../UnsplashSearch";
 import IconePicker from "./components/IconePicker";
+import { useImagens, EstiloVisualPanel, BancoPanel } from "../carrossel";
+import type { FormatoImagem } from "../../lib/gerarImagem";
+import { authHeaders } from "../../lib/supabaseClient";
 
 // ============================================================
 // FEED EDITOR — v7.7
@@ -114,6 +119,7 @@ export default function FeedEditor() {
   const [colaAberta, setColaAberta] = useState(false);
   const [textoCola, setTextoCola] = useState("");
   const [avisosCola, setAvisosCola] = useState<string[]>([]);
+  const [estiloAberto, setEstiloAberto] = useState(false);
   const slideRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Auto-save — salva sempre que slides mudam
@@ -122,6 +128,107 @@ export default function FeedEditor() {
   }, [slides]);
 
   const slideAtivo = slides[slideAtivoIdx];
+
+  const statusAdapter = useMemo(
+    () => ({
+      sucesso: (msg: string, ms = 3000) => {
+        setStatus({ tipo: "sucesso", msg });
+        setTimeout(() => setStatus({ tipo: "idle" }), ms);
+      },
+      erro: (msg: string) => setStatus({ tipo: "erro", msg }),
+    }),
+    []
+  );
+  const img = useImagens<FeedSlideData>({
+    slides,
+    setSlides,
+    status: statusAdapter,
+    resolverFormato: (s): FormatoImagem =>
+      s.templateId.startsWith("stories") ? "stories" : "feed",
+    rotularSlide: (s) => s.pilula || s.headline || "",
+  });
+
+  // Banco de imagens (paridade com o carrossel)
+  const [bancoAberto, setBancoAberto] = useState(false);
+  const [salvandoBanco, setSalvandoBanco] = useState(false);
+
+  // Salva os PNGs finais no bucket slides-finais (peca = Feed/Stories por template).
+  const salvarSlidesFinais = async () => {
+    const arr = slides
+      .map((s, i) => {
+        const el = slideRefs.current.get(s.id);
+        return el ? { s, i, el } : null;
+      })
+      .filter((x): x is { s: FeedSlideData; i: number; el: HTMLDivElement } => x !== null);
+    if (arr.length !== slides.length) {
+      setStatus({ tipo: "erro", msg: "Alguns slides não estão prontos. Tente em 1-2 segundos." });
+      return;
+    }
+    setSalvandoBanco(true);
+    setStatus({ tipo: "exportando", atual: 0, total: arr.length });
+    let ok = 0;
+    let caminho = "";
+    const urls: { n: number; url: string }[] = [];
+    try {
+      for (let i = 0; i < arr.length; i++) {
+        setStatus({ tipo: "exportando", atual: i + 1, total: arr.length });
+        const { s, el } = arr[i];
+        const isStories = s.templateId.startsWith("stories");
+        const peca = img.banco.peca || (isStories ? "Stories" : "Feed");
+        // v7.20.3: isola o slide da captura (esconde os outros) — evita toPng lento.
+        arr.forEach((x, j) => { if (j !== i) x.el.style.display = "none"; });
+        let dataUrl: string;
+        try {
+          dataUrl = await gerarSlideDataURL(el);
+        } finally {
+          arr.forEach((x) => { x.el.style.display = ""; });
+        }
+        const r = await fetch("/api/slides/salvar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+          body: JSON.stringify({
+            png: dataUrl,
+            mes: img.banco.mes,
+            semana: img.banco.semana,
+            peca,
+            slide: i + 1,
+          }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (data.configured === false) {
+          setStatus({ tipo: "erro", msg: "Repositório não configurado (defina SUPABASE_* na Vercel)." });
+          setSalvandoBanco(false);
+          return;
+        }
+        if (!r.ok || data.error) throw new Error(data.error || `Erro HTTP ${r.status}`);
+        caminho = data.caminho || caminho;
+        if (data.url) urls.push({ n: i + 1, url: data.url });
+        ok++;
+      }
+      statusAdapter.sucesso(`${ok} ${ok === 1 ? "slide salvo" : "slides salvos"} em ${caminho || "slides-finais"}.`, 5000);
+      // v7.20: copia as artes pra pasta da semana no Drive + Slack de aprovação
+      try {
+        const rf = await fetch("/api/slides/finalizar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+          body: JSON.stringify({
+            mes: img.banco.mes,
+            semana: img.banco.semana,
+            peca: img.banco.peca || "Feed",
+            slides: urls,
+          }),
+        });
+        const df = await rf.json().catch(() => ({}));
+        if (df && df.configured !== false && df.driveUrl) {
+          statusAdapter.sucesso(`Artes salvas no Drive (${df.salvos}). Link enviado no Slack pra aprovação.`, 7000);
+        }
+      } catch {}
+    } catch (e: any) {
+      setStatus({ tipo: "erro", msg: e?.message || "Falha ao salvar os slides." });
+    } finally {
+      setSalvandoBanco(false);
+    }
+  };
 
   const atualizarSlide = (patch: Partial<FeedSlideData>) => {
     setSlides((s) =>
@@ -238,7 +345,7 @@ export default function FeedEditor() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const url = ev.target?.result as string;
-      atualizarSlide({ fotoUrl: url });
+      atualizarSlide({ fotoUrl: url, fotoOrigem: "manual", imgStatus: "idle", imgErro: undefined });
     };
     reader.readAsDataURL(file);
   };
@@ -309,6 +416,56 @@ export default function FeedEditor() {
             >
               <Clipboard size={14} /> Colar texto em lote
             </button>
+            <button
+              onClick={() => setEstiloAberto((v) => !v)}
+              style={btnStyle(estiloAberto ? "#FFC528" : "#1F2937", estiloAberto ? "#000" : "#fff", "#374151")}
+              title="Estética global aplicada a todas as imagens geradas por IA"
+            >
+              <Sparkles size={14} /> Estilo visual
+            </button>
+            <button
+              onClick={() => setBancoAberto((v) => !v)}
+              style={btnStyle(bancoAberto ? "#FFC528" : "#1F2937", bancoAberto ? "#000" : "#fff", "#374151")}
+              title="Etiquetas + repositório de imagens (Supabase)"
+            >
+              <Library size={14} /> Banco de imagens
+            </button>
+            <button
+              onClick={img.gerarLote}
+              disabled={img.gerandoLote || img.slidesPendentes === 0}
+              style={{
+                ...btnStyle("#1F2937", "#FFC528", "#5b4a12"),
+                opacity: img.gerandoLote || img.slidesPendentes === 0 ? 0.45 : 1,
+              }}
+              title={img.slidesPendentes === 0 ? "Nenhum slide com IMGPROMPT pendente" : "Gera a imagem de todos os slides com IMGPROMPT sem foto"}
+            >
+              {img.gerandoLote ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />{" "}
+                  {img.progresso ? `Gerando ${img.progresso.atual} de ${img.progresso.total}` : "Gerando…"}
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} /> Gerar imagens (IA){img.slidesPendentes > 0 ? ` (${img.slidesPendentes})` : ""}
+                </>
+              )}
+            </button>
+            <button
+              onClick={salvarSlidesFinais}
+              disabled={salvandoBanco}
+              style={{ ...btnStyle("#1F2937", "#FFC528", "#5b4a12"), opacity: salvandoBanco ? 0.45 : 1 }}
+              title="Renderiza os slides e salva no repositório (bucket slides-finais)"
+            >
+              {salvandoBanco ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Salvando…
+                </>
+              ) : (
+                <>
+                  <UploadCloud size={14} /> Salvar slides
+                </>
+              )}
+            </button>
             <button onClick={exportarZIP} disabled={status.tipo === "exportando"} style={btnStyle("#FFC528", "#000")}>
               {status.tipo === "exportando" ? (
                 <>
@@ -322,6 +479,50 @@ export default function FeedEditor() {
             </button>
           </div>
         </div>
+
+        {estiloAberto && (
+          <div style={{ marginBottom: 16 }}>
+            <EstiloVisualPanel img={img} onFechar={() => setEstiloAberto(false)} />
+          </div>
+        )}
+
+        {bancoAberto && (
+          <div style={{ marginBottom: 16 }}>
+            <BancoPanel
+              img={img}
+              slideAtivoNum={slideAtivoIdx + 1}
+              onUsarNoSlide={(url) =>
+                atualizarSlide({ fotoUrl: url, fotoOrigem: "manual", imgStatus: "ok", imgErro: undefined })
+              }
+              onFechar={() => setBancoAberto(false)}
+            />
+          </div>
+        )}
+
+        {img.gerandoLote && img.progresso && (
+          <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: "#141414", border: "1px solid rgba(255,197,40,0.3)", display: "flex", alignItems: "center", gap: 14 }}>
+            <Loader2 size={20} className="animate-spin" color="#FFC528" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+                  Gerando imagem {img.progresso.atual} de {img.progresso.total}
+                </span>
+                <span style={{ fontSize: 11, color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {img.progresso.rotulo}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 8, background: "#0a0a0a", borderRadius: 999, overflow: "hidden" }}>
+                <div style={{ height: "100%", background: "#FFC528", width: `${Math.round((img.progresso.atual / img.progresso.total) * 100)}%`, transition: "width 200ms" }} />
+              </div>
+            </div>
+            <button
+              onClick={img.cancelarLote}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 6, fontSize: 13, fontWeight: 700, background: "#1a1a1a", border: "1px solid #444", color: "#ccc", cursor: "pointer", flexShrink: 0 }}
+            >
+              <X size={16} /> Cancelar
+            </button>
+          </div>
+        )}
 
         {/* STATUS BAR */}
         {status.tipo !== "idle" && status.tipo !== "exportando" && (
@@ -621,6 +822,7 @@ export default function FeedEditor() {
               slide={slideAtivo}
               onChange={atualizarSlide}
               onUploadFoto={handleUploadFoto}
+              onGerarImagem={(forcar) => img.gerarSlide(slideAtivo.id, { forcar })}
             />
           )}
         </div>
@@ -707,10 +909,12 @@ function PainelEdicao({
   slide,
   onChange,
   onUploadFoto,
+  onGerarImagem,
 }: {
   slide: FeedSlideData;
   onChange: (patch: Partial<FeedSlideData>) => void;
   onUploadFoto: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onGerarImagem?: (forcar?: boolean) => void;
 }) {
   const tplInfo = TEMPLATES_DISPONIVEIS.find((t) => t.id === slide.templateId);
   const camposUsados = tplInfo?.camposUsados || [];
@@ -999,6 +1203,36 @@ function PainelEdicao({
       {/* FOTO */}
       {usaFoto && (
         <Secao titulo="Foto deste slide" icone={<ImageIcon size={12} />}>
+          <div style={{ marginBottom: 12, padding: 12, borderRadius: 8, background: "#0f0f0f", border: "1px solid rgba(255,197,40,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <Sparkles size={13} color="#FFC528" />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: "0.05em" }}>Imagem por IA</span>
+              {slide.fotoOrigem === "ia" && slide.fotoUrl && (
+                <span style={{ marginLeft: "auto", fontSize: 9, color: "#34d399", fontWeight: 700 }}>✓ Gerada</span>
+              )}
+            </div>
+            <textarea
+              value={slide.imgPrompt || ""}
+              onChange={(e) => onChange({ imgPrompt: e.target.value })}
+              rows={3}
+              placeholder="Descreva só a CENA: quem, onde, enquadramento…"
+              style={{ width: "100%", background: "#141414", border: "1px solid #333", borderRadius: 6, padding: 8, fontSize: 12, color: "#fff", resize: "vertical", fontFamily: "Poppins, sans-serif", boxSizing: "border-box" }}
+            />
+            <p style={{ fontSize: 10, color: "#777", margin: "6px 0 0" }}>Estética e proporção vêm do "Estilo visual" global. Aqui só a cena.</p>
+            {slide.imgStatus === "erro" && slide.imgErro && (
+              <div style={{ marginTop: 8, fontSize: 10, color: "#fca5a5", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 6, padding: "6px 8px", display: "flex", gap: 6 }}>
+                <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>{slide.imgErro}</span>
+              </div>
+            )}
+            <button
+              onClick={() => onGerarImagem?.(slide.fotoOrigem === "ia")}
+              disabled={slide.imgStatus === "gerando" || !(slide.imgPrompt || "").trim()}
+              style={{ marginTop: 8, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: 8, borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", border: slide.fotoOrigem === "ia" && slide.fotoUrl ? "1px solid #444" : "none", background: slide.fotoOrigem === "ia" && slide.fotoUrl ? "#1a1a1a" : "#FFC528", color: slide.fotoOrigem === "ia" && slide.fotoUrl ? "#eee" : "#000", opacity: slide.imgStatus === "gerando" || !(slide.imgPrompt || "").trim() ? 0.45 : 1 }}
+            >
+              {slide.imgStatus === "gerando" ? (<><Loader2 size={13} className="animate-spin" /> Gerando…</>) : slide.fotoOrigem === "ia" && slide.fotoUrl ? (<><RefreshCcw size={13} /> Regerar variação</>) : (<><Sparkles size={13} /> Gerar imagem</>)}
+            </button>
+          </div>
           <input
             type="file"
             accept="image/*"
@@ -1009,7 +1243,9 @@ function PainelEdicao({
             <UnsplashSearch
               grupoIndex={0}
               valorAtual={slide.fotoUrl || ""}
-              onSelectImage={(url) => onChange({ fotoUrl: url })}
+              onSelectImage={(url) =>
+                onChange({ fotoUrl: url, fotoOrigem: "manual", imgStatus: "idle", imgErro: undefined })
+              }
             />
           </div>
           {slide.fotoUrl && (
@@ -1055,9 +1291,7 @@ function PainelEdicao({
                       fontStyle: "italic",
                     }}
                   >
-                    {(slide.fotoZoom ?? 1) > 1
-                      ? "💡 Arraste a foto no preview pra reposicionar"
-                      : "Aumente o zoom pra poder arrastar a foto"}
+                    {"💡 Arraste a foto no preview pra reposicionar · role o scroll pra dar zoom (nunca passa da borda)"}
                   </p>
                   {((slide.fotoZoom ?? 1) !== 1 ||
                     (slide.fotoOffsetX ?? 0) !== 0 ||

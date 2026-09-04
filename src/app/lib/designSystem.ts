@@ -20,15 +20,16 @@ export const COLORS = {
 
   // Grafites (dark mode base)
   graphite: {
-    void: "#050505",      // Fundo principal (mais escuro que preto puro)
-    base: "#0A0A0A",      // Container principal
-    raised: "#0F0F0F",    // Cards
-    elevated: "#141414",  // Cards sobrepostos / painéis
-    sunken: "#1A1A1A",    // Inputs, elementos interativos
-    border: "#262626",    // Borders, dividers
-    muted: "#3D3D3D",     // Texto desabilitado
-    subtle: "#6B6B6B",    // Texto secundário
-    soft: "#A1A1A1",      // Texto terciário
+    // Escala "Cinza fria" do DS — grafite premium, sem preto puro.
+    void: "#16181C",      // Fundo principal (gray-900)
+    base: "#16181C",      // Container principal
+    raised: "#1D2025",    // Cards / painéis
+    elevated: "#24282F",  // Cards sobrepostos / painéis aninhados
+    sunken: "#191B20",    // Inputs, elementos interativos
+    border: "#2A2E35",    // Borders, dividers
+    muted: "#43464E",     // Texto desabilitado (gray-700)
+    subtle: "#868B96",    // Texto secundário (gray-500)
+    soft: "#AEB2BC",      // Texto terciário (gray-400)
   },
 
   // Neutros (light mode)
@@ -188,15 +189,15 @@ export const THEMES: Record<Mode, Theme> = {
       sunken: COLORS.graphite.sunken,
     },
     text: {
-      primary: "#FFFFFF",
+      primary: "#F5F6F8",
       secondary: COLORS.graphite.soft,
       muted: COLORS.graphite.subtle,
       inverse: COLORS.graphite.void,
     },
     border: {
       default: COLORS.graphite.border,
-      muted: "#1F1F1F",
-      strong: "#333333",
+      muted: "#212429",
+      strong: "#3A3E45",
     },
     accent: {
       primary: COLORS.yellow.DEFAULT,

@@ -3,6 +3,7 @@ import TemplateFeedPilulaHeadline from "./templates/feed_pilula_headline";
 import TemplateStoriesPilulaHeadline from "./templates/stories_pilula_headline";
 import TemplateFeedIconeCta from "./templates/feed_icone_cta";
 import TemplateStoriesIconeCta from "./templates/stories_icone_cta";
+import TemplateStoriesChamada from "./templates/stories_chamada";
 
 /**
  * Renderiza um slide Feed/Stories baseado no templateId.
@@ -38,6 +39,8 @@ export default function FeedSlide({
       return <TemplateFeedIconeCta slide={slide} escala={escala} onSlideChange={onSlideChange} />;
     case "stories_icone_cta":
       return <TemplateStoriesIconeCta slide={slide} escala={escala} onSlideChange={onSlideChange} />;
+    case "stories_chamada":
+      return <TemplateStoriesChamada slide={slide} escala={escala} onSlideChange={onSlideChange} />;
     default:
       return <TemplatePlaceholder slide={slide} escala={escala} />;
   }
@@ -179,6 +182,28 @@ export const TEMPLATES_DISPONIVEIS: TemplateInfo[] = [
     },
   },
   {
+    id: "stories_chamada",
+    nome: "Story do carrossel (chamada) — Stories (1080×1920)",
+    descricao: "Divulga o carrossel: foto da capa + título + 'Saiba mais no feed'",
+    formato: "stories",
+    camposUsados: ["headline", "foto"],
+    exemplo: {
+      templateId: "stories_chamada",
+      pilula: "",
+      headline: "A receita mora\ndentro da sua base",
+      subhead: "",
+      tagline: "",
+      cta: "",
+      fotoUrl: "",
+      fotoPosicao: "center",
+      mostrarPilula: false,
+      mostrarFooter: true,
+      mostrarCTA: false,
+      tipoRodape: "rodape_02",
+      iconeNome: "CircleDollarSign",
+    },
+  },
+  {
     id: "stories_icone_cta",
     nome: "Ícone + CTA outline — Stories (1080×1920)",
     descricao: "Versão stories: foto vertical + mesma estrutura do Feed",
@@ -282,5 +307,6 @@ export function templateImplementado(id: FeedTemplateId): boolean {
     "stories_pilula_headline",
     "feed_icone_cta",
     "stories_icone_cta",
+    "stories_chamada",
   ].includes(id);
 }

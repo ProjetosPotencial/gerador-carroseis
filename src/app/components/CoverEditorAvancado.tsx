@@ -5,6 +5,8 @@ import UnsplashSearch from "./UnsplashSearch";
 import { gerarCapaPNG } from "../lib/gerarCapa";
 import SelectIconeComPreview, { iconesDisponiveis } from "./SelectIconeComPreview";
 import { useLocalStorage } from "../lib/useLocalStorage";
+import { useEstiloVisual, EstiloVisualPanel } from "./carrossel";
+import { gerarImagem as gerarImagemIA, ErroGerarImagem } from "../lib/gerarImagem";
 
 function IconeCustomizado({ IconeComponente }: { IconeComponente: any }) {
   // Shape amarelo está em left:77 top:301 com 85×85
@@ -41,6 +43,60 @@ export default function CoverEditorAvancado() {
   const [opacidadeTextura, setOpacidadeTextura] = useLocalStorage(KEY("opacidadeTextura"), 0.75);
   const [status, setStatus] = useState<Status>({ tipo: "idle" });
   const capaRef = useRef<HTMLDivElement>(null);
+
+  const [imgPrompt, setImgPrompt] = useLocalStorage(KEY("imgPrompt"), "");
+  const [imgGerando, setImgGerando] = useState(false);
+  const [imgErro, setImgErro] = useState<string | null>(null);
+  const [imgGerada, setImgGerada] = useState(false);
+  const [estiloAberto, setEstiloAberto] = useState(false);
+
+  const statusAdapter = useMemo(
+    () => ({
+      sucesso: () => {
+        setStatus({ tipo: "sucesso" });
+        setTimeout(() => setStatus({ tipo: "idle" }), 2500);
+      },
+      erro: (msg: string) => setStatus({ tipo: "erro", msg }),
+    }),
+    []
+  );
+  const estilo = useEstiloVisual(statusAdapter);
+
+  const gerarImagemCapa = async () => {
+    const cena = imgPrompt.trim();
+    if (!cena) {
+      setImgErro("Escreva um prompt de cena antes de gerar.");
+      return;
+    }
+    if (imgGerada && fotoUrl) {
+      // regerar
+    } else if (fotoUrl && !fotoUrl.startsWith("/assets/")) {
+      const ok = window.confirm("Já existe uma foto nesta capa. Substituir pela imagem gerada por IA?");
+      if (!ok) return;
+    }
+    setImgGerando(true);
+    setImgErro(null);
+    try {
+      const { dataUrl } = await gerarImagemIA({
+        cena,
+        estiloVisual: estilo.estiloVisual,
+        negativePrompt: estilo.negativePrompt,
+        formato: "linkedin",
+        modelo: estilo.modelo || undefined,
+        apiKey: estilo.chaveGemini || undefined,
+      });
+      setFotoUrl(dataUrl);
+      setFotoZoom(1);
+      setFotoOffsetX(0);
+      setFotoOffsetY(0);
+      setImgGerada(true);
+    } catch (err: any) {
+      const msg = err instanceof ErroGerarImagem ? err.message : err?.message || "Erro ao gerar imagem.";
+      setImgErro(msg);
+    } finally {
+      setImgGerando(false);
+    }
+  };
 
   const IconeComponente = iconesDisponiveis[iconeEscolhido as keyof typeof iconesDisponiveis];
   const caracteresTitulo = titulo.length;
@@ -263,14 +319,38 @@ export default function CoverEditorAvancado() {
                   id="foto"
                   type="text"
                   value={fotoUrl}
-                  onChange={(e) => setFotoUrl(e.target.value)}
+                  onChange={(e) => { setFotoUrl(e.target.value); setImgGerada(false); }}
                   className="input-base"
                   placeholder="https://images.unsplash.com/..."
                 />
               </FieldWrapper>
 
+              <div className="p-3 rounded-lg bg-[#0f0f0f] border border-[#FFC528]/25 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <LucideIcons.Wand2 size={13} className="text-[#FFC528]" />
+                  <span className="text-[11px] font-bold text-white uppercase tracking-wider">Imagem por IA</span>
+                  {imgGerada && (<span className="ml-auto text-[9px] text-emerald-400 font-bold">✓ Gerada</span>)}
+                  <button type="button" onClick={() => setEstiloAberto((v) => !v)} className={`text-[10px] px-2 py-0.5 rounded border ${imgGerada ? "" : "ml-auto"} ${estiloAberto ? "bg-[#FFC528] text-black border-[#FFC528]" : "border-gray-700 text-gray-300 hover:border-[#FFC528]"}`}>Estilo visual</button>
+                </div>
+                <textarea value={imgPrompt} onChange={(e) => setImgPrompt(e.target.value)} rows={3} placeholder="Descreva só a CENA: quem, onde, enquadramento, espaço livre p/ texto…" className="w-full bg-[#141414] border border-gray-800 rounded-md px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#FFC528] placeholder:text-gray-600 resize-none" />
+                <p className="text-[10px] text-gray-600">Estética e proporção (16:9) vêm do "Estilo visual" global. Aqui só a cena.</p>
+                {imgErro && (
+                  <div className="flex items-start gap-1.5 text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
+                    <LucideIcons.AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+                    <span>{imgErro}</span>
+                  </div>
+                )}
+                <button type="button" onClick={gerarImagemCapa} disabled={imgGerando || !imgPrompt.trim()} className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[11px] font-bold transition-all disabled:opacity-40 ${imgGerada ? "bg-[#1a1a1a] border border-gray-700 text-gray-200 hover:border-[#FFC528]" : "bg-[#FFC528] text-black hover:bg-[#ffd55a]"}`}>
+                  {imgGerando ? (<><Spinner size={13} /> Gerando…</>) : imgGerada ? (<><LucideIcons.RefreshCw size={13} /> Regerar variação</>) : (<><LucideIcons.ImagePlus size={13} /> Gerar imagem</>)}
+                </button>
+              </div>
+
+              {estiloAberto && (
+                <EstiloVisualPanel img={estilo} onFechar={() => setEstiloAberto(false)} />
+              )}
+
               <UnsplashSearch
-                onSelectImage={(url) => setFotoUrl(url)}
+                onSelectImage={(url) => { setFotoUrl(url); setImgGerada(false); }}
                 grupoIndex={0}
                 valorAtual={fotoUrl}
               />

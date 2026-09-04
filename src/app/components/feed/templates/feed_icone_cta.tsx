@@ -50,19 +50,19 @@ export default function TemplateFeedIconeCta({
   const escalaGeral = slide.escalaGeral ?? 1;
 
   // ===== Tipografia (defaults originais) =====
-  const tamIcone = slide.tamIcone ?? 120;
-  const espessuraIcone = slide.espessuraIcone ?? 2;
+  const tamIcone = slide.tamIcone ?? 72;  // v7.20.16
+  const espessuraIcone = slide.espessuraIcone ?? 1;  // v7.20.16: stroke 1
   const pesoHeadline = slide.pesoHeadline ?? 600;
-  const tamHeadline = slide.tamHeadline ?? 92;
+  const tamHeadline = slide.tamHeadline ?? 58;  // v7.20.14
   const italicHeadline = slide.italicHeadline ?? false;
   const pesoSubhead = slide.pesoSubhead ?? 800;
-  const tamSubhead = slide.tamSubhead ?? 92;
+  const tamSubhead = slide.tamSubhead ?? 58;  // v7.20.14
   const italicSubhead = slide.italicSubhead ?? false;
   const pesoTagline = slide.pesoTagline ?? 400;
-  const tamTagline = slide.tamTagline ?? 38;
+  const tamTagline = slide.tamTagline ?? 33;
   const italicTagline = slide.italicTagline ?? false;
   const pesoCTA = slide.pesoCTA ?? 700;
-  const tamCTA = slide.tamCTA ?? 32;
+  const tamCTA = slide.tamCTA ?? 30;
   const italicCTA = slide.italicCTA ?? false;
 
   // ===== Rodapé =====
@@ -71,7 +71,7 @@ export default function TemplateFeedIconeCta({
   const alturaUtil = 1350 - alturaRodape;
 
   // ===== Textura =====
-  const mostrarTextura = slide.mostrarTextura !== false;
+  const mostrarTextura = slide.mostrarTextura === true;
   const opacidadeTextura = slide.opacidadeTextura ?? 0.75;
   const modoTextura = slide.modoTextura ?? "overlay";
 
@@ -86,9 +86,9 @@ export default function TemplateFeedIconeCta({
   const lhCTA = slide.lineHeightCTA ?? 1.0;
 
   // ===== Espaçamentos do bloco (8pt grid, customizáveis) — v7.7.9 =====
-  const gapIconeHeadline = slide.gapIconeHeadline ?? 24;
-  const gapHeadlineSubhead = slide.gapHeadlineSubhead ?? 32;
-  const gapSubheadCTA = slide.gapSubheadCTA ?? 80;
+  const gapIconeHeadline = slide.gapIconeHeadline ?? 16;
+  const gapHeadlineSubhead = slide.gapHeadlineSubhead ?? 14;
+  const gapSubheadCTA = slide.gapSubheadCTA ?? 58;
   const gapCTARodape = slide.gapCTARodape ?? 72;
 
   // ===== Margens inferiores individuais por elemento (v7.7.10) =====
@@ -115,9 +115,27 @@ export default function TemplateFeedIconeCta({
 
   // Posições calculadas bottom-up, considerando line-height na altura efetiva
   // dos textos (texto com lh > 1 ocupa mais vertical).
-  const alturaHeadline = tamHeadline * escalaGeral * lhHeadline;
-  const alturaSubhead = tamSubhead * escalaGeral * lhSubhead;
-  const alturaTagline = tamTagline * escalaGeral * lhTagline;
+  // v7.20.11: conta linhas considerando quebra manual (\n) E quebra automática
+  // por largura — antes só contava \n, então tagline que quebrava sozinha
+  // encavalava o CTA. larguraTexto = 1080 - 72(esq) - 72(dir).
+  const larguraTexto = 1080 - 72 - 72;
+  const contarLinhas = (t: string | undefined, fontPx: number, fator = 0.56) => {
+    const s = String(t || "");
+    if (!s.trim()) return 1;
+    const cpl = Math.max(1, Math.floor(larguraTexto / (fontPx * fator)));
+    return s
+      .split("\n")
+      .reduce((acc, ln) => acc + Math.max(1, Math.ceil(ln.trim().length / cpl)), 0);
+  };
+  const alturaHeadline =
+    tamHeadline * escalaGeral * lhHeadline *
+    contarLinhas(slide.headline, tamHeadline * escalaGeral);
+  const alturaSubhead =
+    tamSubhead * escalaGeral * lhSubhead *
+    contarLinhas(slide.subhead, tamSubhead * escalaGeral);
+  const alturaTagline =
+    tamTagline * escalaGeral * lhTagline *
+    contarLinhas(slide.tagline, tamTagline * escalaGeral);
 
   const yTagline = temTagline
     ? yCTA - gapTaglineCTA - mbTagline - alturaTagline
@@ -157,7 +175,7 @@ export default function TemplateFeedIconeCta({
           src={slide.fotoUrl}
           width={1080 * escala}
           height={1350 * escala}
-          zoom={slide.fotoZoom ?? 1}
+          zoom={slide.fotoZoom ?? 1.08}
           offsetX={slide.fotoOffsetX ?? 0}
           offsetY={slide.fotoOffsetY ?? 0}
           onPositionChange={
@@ -165,6 +183,7 @@ export default function TemplateFeedIconeCta({
               ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y })
               : undefined
           }
+          onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
         />
         ) : (
           <div
@@ -200,6 +219,21 @@ export default function TemplateFeedIconeCta({
         alturaUtil={alturaUtil}
         alturaTotal={1350}
         escala={escala}
+      />
+
+      {/* v7.20.14: scrim de leitura por baixo do texto (parte inferior escurece
+          gradualmente pra dar contraste ao texto branco sobre foto clara) */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: e(1350 * 0.72),
+          background:
+            "linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.62) 26%, rgba(0,0,0,0.34) 58%, rgba(0,0,0,0) 100%)",
+          pointerEvents: "none",
+        }}
       />
 
       {/* BLOCO DE TEXTO (com offsetY pra ajuste fino) */}

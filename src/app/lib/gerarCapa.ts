@@ -1,4 +1,5 @@
 import { toPng } from "html-to-image";
+import { fontCssUmaVez } from "./gerarCarrossel";
 
 /**
  * Dimensões do design base. PRECISAM bater com as do LinkedInCover.tsx.
@@ -229,13 +230,14 @@ async function gerarDataURL(
 
   // 5. Gera o PNG
   try {
+    const fontEmbedCSS = await fontCssUmaVez();
     const dataUrl = await toPng(elemento, {
       cacheBust: true,
       pixelRatio,
       width: BASE_WIDTH,
       height: BASE_HEIGHT,
       backgroundColor: "#ffffff",
-      skipFonts: false,
+      fontEmbedCSS,
       fetchRequestInit: {
         cache: "no-cache",
         mode: "cors",

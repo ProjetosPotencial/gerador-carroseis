@@ -107,6 +107,12 @@ export interface SlideData {
   fotoUrl: string;
   fotoUrl2: string;
 
+  // ============ GERAÇÃO DE IMAGEM COM IA (v7.8) ============
+  imgPrompt?: string;
+  imgStatus?: "idle" | "gerando" | "ok" | "erro";
+  imgErro?: string;
+  fotoOrigem?: "ia" | "manual";
+
   /** v7.7.23: zoom da foto principal (1-3, default 1). */
   fotoZoom?: number;
   /** v7.7.23: offset X da foto em % (-50 a +50, default 0). */
@@ -123,6 +129,10 @@ export interface SlideData {
   corDestaque?: string;
   /** v7.5: cor dos textos da Topbar (marca + textos do topo) */
   corTopbar?: string;
+  /** v7.25: texto do topbar (override do marca). */
+  textoTopbar?: string;
+  /** v7.25: tamanho do texto do topbar (px). */
+  tamTopbar?: number;
   /** v7.5: cor do texto/rodapé inferior (ex: "▶ BRANDS PAGE 5/000") */
   corRodape?: string;
   /** v7.5: cor da numeração do slide ("01 / 06") */

@@ -19,6 +19,42 @@ export function slidesIniciaisDoTema(temaId: TemaId): SlideData[] {
   return tema.slidesExemplo.map((s) => ({ ...s, id: uid() }));
 }
 
+/** v7.8: inverte a cor de fundo (preto <-> amarelo) dos slides de cor sólida. */
+export function inverterCoresDeck(slides: SlideData[]): SlideData[] {
+  return slides.map((s) => {
+    if ((s.layout || "").includes("foto")) return s;
+    if (s.corFundo !== "preto" && s.corFundo !== "amarelo") return s;
+    const novaCor: SlideData["corFundo"] = s.corFundo === "preto" ? "amarelo" : "preto";
+    return {
+      ...s,
+      corFundo: novaCor,
+      corKicker: undefined,
+      corHeadline: undefined,
+      corDestaque: undefined,
+      corTopbar: undefined,
+      corRodape: undefined,
+      corNumero: undefined,
+      corSetinha: undefined,
+    };
+  });
+}
+
+const PARIDADE_KEY = "parceleaqui:carrossel:paridadeCor:v1";
+
+/** v7.8: estrutura padrão alternando a paleta a cada novo carrossel. */
+export function proximaEstruturaPadrao(temaId: TemaId): SlideData[] {
+  let p = 0;
+  try {
+    p = parseInt(localStorage.getItem(PARIDADE_KEY) || "0", 10) || 0;
+  } catch {}
+  let slides = slidesIniciaisDoTema(temaId);
+  if (p % 2 === 1) slides = inverterCoresDeck(slides);
+  try {
+    localStorage.setItem(PARIDADE_KEY, String((p + 1) % 1000000));
+  } catch {}
+  return slides;
+}
+
 function carregarSalvos(): SlideData[] | null {
   try {
     const raw = localStorage.getItem(AUTOSAVE_KEY);
@@ -62,7 +98,7 @@ export interface UseSlidesReturn {
  */
 export function useSlides(temaIdInicial: TemaId): UseSlidesReturn {
   const [slides, setSlides] = useState<SlideData[]>(
-    () => carregarSalvos() ?? slidesIniciaisDoTema(temaIdInicial)
+    () => carregarSalvos() ?? proximaEstruturaPadrao(temaIdInicial)
   );
   const [indiceAtivo, setIndiceAtivo] = useState(0);
 
@@ -133,7 +169,7 @@ export function useSlides(temaIdInicial: TemaId): UseSlidesReturn {
   );
 
   const resetarParaExemplos = useCallback((temaId: TemaId) => {
-    setSlides(slidesIniciaisDoTema(temaId));
+    setSlides(proximaEstruturaPadrao(temaId));
     setIndiceAtivo(0);
   }, []);
 
@@ -141,7 +177,7 @@ export function useSlides(temaIdInicial: TemaId): UseSlidesReturn {
     try {
       localStorage.removeItem(AUTOSAVE_KEY);
     } catch {}
-    setSlides(slidesIniciaisDoTema(temaId));
+    setSlides(proximaEstruturaPadrao(temaId));
     setIndiceAtivo(0);
   }, []);
 

@@ -15,39 +15,35 @@ export const config = {
   runtime: "edge",
 };
 
-// Modelos válidos no OpenRouter (verificados em abril/2026).
+// Modelos válidos no OpenRouter (atualizados em 07/2026).
 const MODELOS_PERMITIDOS = [
   // Premium (pagos)
-  "anthropic/claude-3.5-sonnet",
-  "anthropic/claude-3.5-haiku",
+  "anthropic/claude-sonnet-4.5",
+  "anthropic/claude-haiku-4.5",
   "openai/gpt-4o",
   "openai/gpt-4o-mini",
-  "google/gemini-flash-1.5",
+  "google/gemini-2.5-flash",
   "deepseek/deepseek-chat",
   // Grátis
-  "google/gemini-2.0-flash-exp:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
   "deepseek/deepseek-r1:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
   "qwen/qwen-2.5-72b-instruct:free",
-  "mistralai/mistral-nemo:free",
-  "google/gemma-2-9b-it:free",
 ];
 
 // Cadeia de fallback: se o modelo escolhido falhar com 429/500, tenta esses (em ordem).
 const FALLBACKS_GRATIS = [
-  "google/gemini-2.0-flash-exp:free",
   "deepseek/deepseek-r1:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
   "qwen/qwen-2.5-72b-instruct:free",
-  "mistralai/mistral-nemo:free",
 ];
 
 const FALLBACKS_PAGOS = [
-  "anthropic/claude-3.5-haiku",
+  "anthropic/claude-haiku-4.5",
   "openai/gpt-4o-mini",
-  "google/gemini-flash-1.5",
+  "google/gemini-2.5-flash",
 ];
 
-const MODELO_DEFAULT = "anthropic/claude-3.5-sonnet";
+const MODELO_DEFAULT = "anthropic/claude-sonnet-4.5";
 
 // Status que justificam tentar outro modelo (sem dar erro pro usuário).
 const STATUS_RETRY = [408, 429, 500, 502, 503, 504];

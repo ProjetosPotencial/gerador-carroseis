@@ -73,6 +73,10 @@ const ROTULOS: Record<string, keyof FeedSlideData> = {
   CTA: "cta",
   BOTAO: "cta",
   BOTÃO: "cta",
+  IMGPROMPT: "imgPrompt",
+  IMAGEM: "imgPrompt",
+  IMAGEMPROMPT: "imgPrompt",
+  PROMPTIMAGEM: "imgPrompt",
 };
 
 function ehDivisor(linha: string): boolean {
@@ -143,6 +147,8 @@ export function parsearTextoFeedStories(texto: string): ResultadoParser {
       mostrarPilula: !!slideAtual.pilula,
       mostrarCTA: !!slideAtual.cta,
       mostrarFooter: true,
+      imgPrompt: (slideAtual.imgPrompt || "").trim() || undefined,
+      imgStatus: (slideAtual.imgPrompt || "").trim() ? "idle" : undefined,
     });
     slideAtual = null;
     ultimoCampo = null;

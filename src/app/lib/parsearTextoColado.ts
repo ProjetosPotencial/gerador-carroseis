@@ -43,7 +43,14 @@ const ROTULOS: Record<string, keyof SlideData> = {
   LAYOUT: "layout",
   CORFUNDO: "corFundo",
   FUNDO: "corFundo",
+  IMGPROMPT: "imgPrompt",
+  IMAGEM: "imgPrompt",
+  IMAGEMPROMPT: "imgPrompt",
+  PROMPTIMAGEM: "imgPrompt",
 };
+
+// SUBHEAD/subtítulo: 2ª parte do título — anexada ao headline (não é campo próprio)
+const ROTULOS_SUBHEAD = new Set(["SUBHEAD", "SUBHEADLINE", "SUBTITULO", "SUBTITLE"]);
 
 // Cores de fundo válidas
 const CORES_FUNDO_VALIDAS: SlideData["corFundo"][] = [
@@ -57,6 +64,7 @@ const CORES_FUNDO_VALIDAS: SlideData["corFundo"][] = [
 const LAYOUTS_VALIDOS: LayoutId[] = [
   // Classic
   "foto_cheia",
+  "foto_cheia_final",
   "split_horizontal",
   "split_invertido",
   "tipografia_pura",
@@ -236,12 +244,32 @@ function parsearBloco(bloco: string, indice: number, avisos: string[]): SlideDat
   // Flush final
   flush();
 
+  // Norma de título: sem ponto final; 1ª frase vira vírgula (item de estilo do cliente)
+  if (slide.headline) slide.headline = normalizarTitulo(slide.headline);
+
   if (!encontrouAlgumCampo) {
     avisos.push(`Slide ${indice + 1}: nenhum rótulo válido encontrado, ignorado.`);
     return null;
   }
 
   return slide;
+}
+
+// ============================================================
+// NORMA DE TÍTULO (headline)
+// ============================================================
+
+/**
+ * Regras de título do cliente:
+ * - nunca terminar com ponto final;
+ * - se houver duas frases, a primeira termina em vírgula e a segunda sem ponto.
+ * Ex.: "Recebimento à vista. Família paga em 12x." -> "Recebimento à vista, Família paga em 12x"
+ */
+function normalizarTitulo(h: string): string {
+  let s = h.replace(/\s+$/, "");        // remove brancos finais
+  s = s.replace(/\.\s*$/, "");          // remove ponto final
+  s = s.replace(/\.(?=\s)/g, ",");      // ponto no meio (fim de frase) vira vírgula
+  return s;
 }
 
 // ============================================================
@@ -262,7 +290,12 @@ function extrairRotulo(linha: string): RotuloExtraido | null {
   const valorInline = match[2].trim();
 
   const campo = ROTULOS[rotuloBruto];
-  if (!campo) return null;
+  if (!campo) {
+    if (ROTULOS_SUBHEAD.has(rotuloBruto)) {
+      return { campo: "__subhead" as any, valorInline };
+    }
+    return null;
+  }
 
   return { campo, valorInline };
 }
@@ -279,6 +312,12 @@ function aplicarCampo(
 ): void {
   if (!valor) return;
 
+  // SUBHEAD: 2ª linha do título — anexa ao headline já existente
+  if ((campo as any) === "__subhead") {
+    slide.headline = slide.headline ? `${slide.headline}\n${valor}` : valor;
+    return;
+  }
+
   switch (campo) {
     case "kicker":
     case "headline":
@@ -287,10 +326,13 @@ function aplicarCampo(
     case "numero":
     case "legendaFoto":
     case "textoPill":
+    case "imgPrompt":
       (slide as any)[campo] = valor;
-      // Se tem texto na pill, ativa automaticamente
       if (campo === "textoPill") {
         slide.mostrarPill = true;
+      }
+      if (campo === "imgPrompt") {
+        slide.imgStatus = "idle";
       }
       break;
 
@@ -332,6 +374,32 @@ function aplicarCampo(
  * - Se o texto tem MENOS slides → remove os extras (mas preserva fotos no que sobra)
  * - Sempre preserva fotos e overrides já configurados nos slides existentes
  */
+/**
+ * v7.9.1: aplica o CONTEÚDO colado (só os textos) sobre uma ESTRUTURA base
+ * (layouts + cores da estrutura padrão do tema). Usado pelo "Colar conteúdo"
+ * para sempre começar do template padrão, na cor da vez, e só preencher o texto.
+ * O layout/cor do texto colado é ignorado — a estrutura manda.
+ */
+export function aplicarNaEstrutura(base: SlideData[], conteudo: SlideData[]): SlideData[] {
+  return conteudo.map((c, i) => {
+    const b = base[i];
+    if (!b) return c; // conteúdo além da estrutura padrão: usa como veio
+    return {
+      ...b,
+      kicker: c.kicker,
+      headline: c.headline,
+      corpo: c.corpo,
+      destaque: c.destaque,
+      numero: c.numero,
+      legendaFoto: c.legendaFoto,
+      textoPill: c.textoPill,
+      mostrarPill: c.mostrarPill,
+      imgPrompt: c.imgPrompt,
+      imgStatus: c.imgStatus,
+    };
+  });
+}
+
 export function sincronizarSlides(
   slidesAtuais: SlideData[],
   slidesParseados: SlideData[]
@@ -345,6 +413,9 @@ export function sincronizarSlides(
         id: atual.id, // mantém ID estável
         fotoUrl: atual.fotoUrl,
         fotoUrl2: atual.fotoUrl2,
+        fotoOrigem: atual.fotoOrigem,
+        imgStatus: atual.fotoUrl ? atual.imgStatus : novo.imgStatus,
+        imgErro: atual.fotoUrl ? atual.imgErro : undefined,
         // Preserva customizações visuais se já existirem
         corKicker: atual.corKicker,
         corHeadline: atual.corHeadline,
@@ -367,8 +438,9 @@ HEADLINE: Por décadas, algo foi
 assunto de poucos.
 CORPO: Aqui você desenvolve o contexto histórico do tema em 2-3 frases.
 DESTAQUE: E então aconteceu a virada.
-LAYOUT: tipografia_pura
+LAYOUT: foto_cheia
 CORFUNDO: amarelo
+IMGPROMPT: pessoa brasileira lendo perto de uma janela ampla, luz natural de manhã, espaço livre à esquerda para texto
 
 ---
 
@@ -388,4 +460,5 @@ por dentro.
 DESTAQUE: Novos estudos toda semana.
 PILL: @POTENCIAL · SIGA
 LAYOUT: foto_cheia
-CORFUNDO: preto`;
+CORFUNDO: preto
+IMGPROMPT: mãos segurando um celular com app financeiro aberto, fundo neutro desfocado, luz suave`;

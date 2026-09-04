@@ -98,7 +98,12 @@ export default function PastePanel({
             <div>
               <strong className="text-gray-400">Rótulos aceitos:</strong> KICKER,
               HEADLINE/TITULO, CORPO/TEXTO, DESTAQUE, NUMERO, LEGENDA, PILL/CTA, LAYOUT,
-              CORFUNDO/FUNDO
+              CORFUNDO/FUNDO, <span className="text-[#FFC528]">IMGPROMPT</span>
+            </div>
+            <div>
+              <strong className="text-gray-400">IMGPROMPT:</strong> descreve só a{" "}
+              <em>cena</em> da imagem (quem, onde, enquadramento). Depois clique em
+              "Gerar imagens (IA)".
             </div>
             <div>
               <strong className="text-gray-400">Cores de fundo:</strong> preto, amarelo,

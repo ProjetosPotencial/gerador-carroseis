@@ -1,18 +1,17 @@
 /**
- * FotoDraggable — exibe a foto de fundo com suporte a:
- * - zoom (1x a 3x via prop)
- * - drag pra reposicionar (quando há onPositionChange E zoom > 1)
+ * FotoDraggable — foto de fundo com ZOOM + ARRASTO modernos (v7.24).
  *
- * Quando o usuário arrasta, dispara onPositionChange com offsets em %
- * (-50 a +50). Esses valores ficam salvos no auto-save do slide.
+ * Recursos:
+ * - Zoom 1x-3x (prop `zoom`), via slider no editor OU scroll do mouse no preview.
+ * - A imagem e renderizada no TAMANHO REAL de cobertura (>= container em ambos os
+ *   eixos). O excedente vira "folga" arrastavel, entao da pra arrastar por toda a
+ *   area visivel — inclusive SEM zoom, quando a foto e mais alta/larga que a janela.
+ * - Pan LIMITADO: a imagem NUNCA sai do quadro (sem borda cortada/vazia).
+ * - Arrasto 1:1 (a foto segue o cursor).
  *
  * Modos:
- * - Editor (preview): drag ativo, cursor grab/grabbing
- * - Export (offscreen, sem onPositionChange): drag desativado, só renderiza
- *
- * IMPORTANTE: pra html2canvas capturar corretamente, o drag NÃO afeta a
- * estrutura DOM — só o objectPosition do <img>. Então no momento do
- * export, a posição salva no slide já é refletida pixel-a-pixel.
+ * - Editor (recebe onPositionChange/onZoomChange): arrasto + scroll ativos.
+ * - Export (sem callbacks): so renderiza a posicao salva, pixel a pixel.
  */
 import { useState, useRef, useEffect } from "react";
 
@@ -22,8 +21,13 @@ interface FotoDraggableProps {
   offsetX?: number;
   offsetY?: number;
   onPositionChange?: (offsetX: number, offsetY: number) => void;
+  onZoomChange?: (zoom: number) => void;
   width: number;
   height: number;
+}
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
 }
 
 export default function FotoDraggable({
@@ -32,79 +36,78 @@ export default function FotoDraggable({
   offsetX = 0,
   offsetY = 0,
   onPositionChange,
+  onZoomChange,
   width,
   height,
 }: FotoDraggableProps) {
+  const z = Math.max(1, Math.min(3, zoom || 1));
+
   const [arrastando, setArrastando] = useState(false);
+  // v7.24: tamanho natural da imagem (default 4:5 vertical — padrao gerado).
+  const [nat, setNat] = useState<{ w: number; h: number }>({ w: 1080, h: 1350 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // refs pra ter sempre o valor mais recente sem re-criar listeners
-  const dragRef = useRef({
-    iniciouEm: { x: 0, y: 0 },
-    offsetInicial: { x: offsetX, y: offsetY },
-  });
+  const coverScale = Math.max(width / nat.w, height / nat.h);
+  const dispW = nat.w * coverScale * z;
+  const dispH = nat.h * coverScale * z;
+  const overflowX = Math.max(0, dispW - width);
+  const overflowY = Math.max(0, dispH - height);
+  const maxOffX = overflowX > 0 ? 50 : 0; // offset normalizado -50..50 (50 = borda)
+  const maxOffY = overflowY > 0 ? 50 : 0;
+  const ox = clamp(offsetX ?? 0, -maxOffX, maxOffX);
+  const oy = clamp(offsetY ?? 0, -maxOffY, maxOffY);
+  const panX = (ox / 50) * (overflowX / 2);
+  const panY = (oy / 50) * (overflowY / 2);
+  const podeArrastar = Boolean(onPositionChange) && (overflowX > 1 || overflowY > 1);
 
-  const podeArrastar = Boolean(onPositionChange) && zoom > 1;
+  const dragRef = useRef({ iniciouEm: { x: 0, y: 0 }, offsetInicial: { x: ox, y: oy } });
+
+  // Zoom por scroll do mouse (listener nativo p/ poder previnir o scroll da pagina)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !onZoomChange) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const fator = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      const nz = clamp(z * fator, 1, 3);
+      onZoomChange(Number(nz.toFixed(3)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [z, onZoomChange]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!podeArrastar) return;
     e.preventDefault();
     e.stopPropagation();
     setArrastando(true);
-    dragRef.current = {
-      iniciouEm: { x: e.clientX, y: e.clientY },
-      offsetInicial: { x: offsetX, y: offsetY },
-    };
+    dragRef.current = { iniciouEm: { x: e.clientX, y: e.clientY }, offsetInicial: { x: ox, y: oy } };
   };
 
   useEffect(() => {
     if (!arrastando) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
       const rect = containerRef.current.getBoundingClientRect();
-      // dx/dy em pixels da viewport → convertido pra % do container
-      const dxPct = ((e.clientX - dragRef.current.iniciouEm.x) / rect.width) * 100;
-      const dyPct = ((e.clientY - dragRef.current.iniciouEm.y) / rect.height) * 100;
-      // v7.7.22: usando transform translate() — sinal natural (foto segue o mouse).
-      // Multiplicar por zoom porque translate é aplicado APÓS scale.
-      const novoX = clamp(dragRef.current.offsetInicial.x + dxPct * zoom, -50, 50);
-      const novoY = clamp(dragRef.current.offsetInicial.y + dyPct * zoom, -50, 50);
+      // px de tela -> px do slide (mesma escala) -> offset normalizado pela folga real.
+      const escX = rect.width / width || 1;
+      const escY = rect.height / height || 1;
+      const dPanX = overflowX > 0 ? (e.clientX - dragRef.current.iniciouEm.x) / escX : 0;
+      const dPanY = overflowY > 0 ? (e.clientY - dragRef.current.iniciouEm.y) / escY : 0;
+      const dOx = overflowX > 0 ? (dPanX / (overflowX / 2)) * 50 : 0;
+      const dOy = overflowY > 0 ? (dPanY / (overflowY / 2)) * 50 : 0;
+      const novoX = clamp(dragRef.current.offsetInicial.x + dOx, -maxOffX, maxOffX);
+      const novoY = clamp(dragRef.current.offsetInicial.y + dOy, -maxOffY, maxOffY);
       onPositionChange(novoX, novoY);
     };
-
-    const handleMouseUp = () => {
-      setArrastando(false);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    const handleUp = () => setArrastando(false);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
     };
-  }, [arrastando, onPositionChange, zoom]);
-
-  // Estratégia v7.7.22: usar transform translate() pra deslocar.
-  // objectPosition tem limite porque só desloca DENTRO do que foi cropado
-  // pelo objectFit. Mas com transform scale + translate, a imagem inteira
-  // pode ser deslocada livremente.
-  //
-  // offsetX/Y vão de -50 a +50 (% do container).
-  // Translate em % é relativo ao TAMANHO da imagem (não do container).
-  // Como a imagem ocupa 100% do container, % traduz 1:1.
-
-  // Quando zoom > 1, há "sobra" de imagem além do container que pode ser deslocada
-  // O quanto pode deslocar: (zoom - 1) / 2 * 100% do container
-  // Mas pra simplificar e bater com a UX (-50 a +50), aplicamos direto
-
-  const transformParts: string[] = [];
-  if (zoom !== 1) transformParts.push(`scale(${zoom})`);
-  if (offsetX !== 0 || offsetY !== 0) {
-    // dividir por zoom porque translate é aplicado APÓS scale
-    transformParts.push(`translate(${offsetX / zoom}%, ${offsetY / zoom}%)`);
-  }
-  const transformValue = transformParts.length > 0 ? transformParts.join(" ") : undefined;
+  }, [arrastando, onPositionChange, overflowX, overflowY, maxOffX, maxOffY, width, height]);
 
   return (
     <div
@@ -118,6 +121,7 @@ export default function FotoDraggable({
         overflow: "hidden",
         cursor: podeArrastar ? (arrastando ? "grabbing" : "grab") : "default",
         userSelect: "none",
+        touchAction: onZoomChange ? "none" : undefined,
       }}
       onMouseDown={handleMouseDown}
     >
@@ -126,20 +130,22 @@ export default function FotoDraggable({
         alt=""
         crossOrigin="anonymous"
         draggable={false}
+        onLoad={(e) => {
+          const im = e.currentTarget;
+          if (im.naturalWidth && im.naturalHeight) setNat({ w: im.naturalWidth, h: im.naturalHeight });
+        }}
         style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: "center",
-          transform: transformValue,
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          width: dispW,
+          height: dispH,
+          maxWidth: "none",
+          transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px)`,
           transformOrigin: "center center",
           pointerEvents: "none",
         }}
       />
     </div>
   );
-}
-
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
 }

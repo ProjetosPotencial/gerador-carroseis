@@ -44,6 +44,7 @@ function LayoutFotoRetrato({ slide, tema, marca, numero, coresResolvidas, onSlid
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
       {/* Overlay escuro concentrado só embaixo */}
       <div
@@ -151,6 +152,7 @@ function LayoutTextoTopoFotoEmbaixo({ slide, tema, marca, numero, coresResolvida
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
 
       {/* Corpo embaixo da foto */}
@@ -211,6 +213,7 @@ function LayoutTextoTopoFotoEmbaixoBege({ slide, tema, marca, numero, coresResol
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
 
       {slide.destaque && (
@@ -352,6 +355,7 @@ function LayoutHeadlineAmarelaPreta({ slide, tema, marca, numero, coresResolvida
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
 
       {slide.corpo && (
@@ -381,6 +385,7 @@ function LayoutFotoFullCTA({ slide, tema, marca, numero, coresResolvidas, onSlid
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
       <div
         style={{

@@ -78,9 +78,9 @@ const CarrosselSlide = forwardRef<HTMLDivElement, Props>(function CarrosselSlide
       {/* Seta indicativa "deslize" no canto inferior direito (todos exceto último) */}
       {!ehUltimo && slide.mostrarSetinha !== false && (
         <SetaDeslizar
-          accent={slide.corSetinha || coresResolvidas.accent}
-          tamanho={slide.tamSetinha ?? 56}
-          espessura={slide.espessuraSetinha ?? 3}
+          accent={slide.corSetinha || (slide.layout === "split_invertido" ? "#ffffff" : coresResolvidas.accent)}
+          tamanho={slide.tamSetinha ?? 120}
+          espessura={slide.espessuraSetinha ?? 5}
         />
       )}
     </div>
@@ -108,8 +108,8 @@ const CarrosselSlide = forwardRef<HTMLDivElement, Props>(function CarrosselSlide
  */
 function SetaDeslizar({
   accent,
-  tamanho = 56,
-  espessura = 3,
+  tamanho = 120,
+  espessura = 5,
 }: {
   accent: string;
   tamanho?: number;
@@ -128,7 +128,7 @@ function SetaDeslizar({
       <svg
         width={tamanho}
         height={tamanho}
-        viewBox="0 0 107 107"
+        viewBox="-9 -9 125 125"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >

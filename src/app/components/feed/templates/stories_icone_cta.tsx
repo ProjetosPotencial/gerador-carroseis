@@ -43,26 +43,26 @@ export default function TemplateStoriesIconeCta({
 
   const escalaGeral = slide.escalaGeral ?? 1;
 
-  const tamIcone = slide.tamIcone ?? 130;
-  const espessuraIcone = slide.espessuraIcone ?? 2;
+  const tamIcone = slide.tamIcone ?? 72;  // v7.22 igualado ao feed  // v7.20.16
+  const espessuraIcone = slide.espessuraIcone ?? 1;  // v7.20.16: stroke 1
   const pesoHeadline = slide.pesoHeadline ?? 600;
-  const tamHeadline = slide.tamHeadline ?? 100;
+  const tamHeadline = slide.tamHeadline ?? 58;  // v7.20.14
   const italicHeadline = slide.italicHeadline ?? false;
   const pesoSubhead = slide.pesoSubhead ?? 800;
-  const tamSubhead = slide.tamSubhead ?? 100;
+  const tamSubhead = slide.tamSubhead ?? 58;  // v7.20.14
   const italicSubhead = slide.italicSubhead ?? false;
   const pesoTagline = slide.pesoTagline ?? 400;
-  const tamTagline = slide.tamTagline ?? 42;
+  const tamTagline = slide.tamTagline ?? 33;
   const italicTagline = slide.italicTagline ?? false;
   const pesoCTA = slide.pesoCTA ?? 700;
-  const tamCTA = slide.tamCTA ?? 36;
+  const tamCTA = slide.tamCTA ?? 30;
   const italicCTA = slide.italicCTA ?? false;
 
   const tipoRodape: TipoRodape = slide.tipoRodape ?? "rodape_01";
   const alturaRodape = obterAlturaRodape(tipoRodape, "stories");
   const alturaUtil = 1920 - alturaRodape;
 
-  const mostrarTextura = slide.mostrarTextura !== false;
+  const mostrarTextura = slide.mostrarTextura === true;
   const opacidadeTextura = slide.opacidadeTextura ?? 0.75;
   const modoTextura = slide.modoTextura ?? "overlay";
 
@@ -76,9 +76,9 @@ export default function TemplateStoriesIconeCta({
   const lhCTA = slide.lineHeightCTA ?? 1.0;
 
   // Espaçamentos do bloco (8pt grid, customizáveis) — v7.7.9
-  const gapIconeHeadline = slide.gapIconeHeadline ?? 24;
-  const gapHeadlineSubhead = slide.gapHeadlineSubhead ?? 32;
-  const gapSubheadCTA = slide.gapSubheadCTA ?? 80;
+  const gapIconeHeadline = slide.gapIconeHeadline ?? 16;
+  const gapHeadlineSubhead = slide.gapHeadlineSubhead ?? 14;
+  const gapSubheadCTA = slide.gapSubheadCTA ?? 58;
   const gapCTARodape = slide.gapCTARodape ?? 72;
 
   // Margens inferiores individuais (v7.7.10)
@@ -96,9 +96,25 @@ export default function TemplateStoriesIconeCta({
   const gapSubheadTagline = temTagline ? Math.max(8, snap8(gapSubheadCTA * 0.6)) : 0;
   const gapTaglineCTA = temTagline ? Math.max(8, snap8(gapSubheadCTA * 0.4)) : 0;
 
-  const alturaHeadline = tamHeadline * escalaGeral * lhHeadline;
-  const alturaSubhead = tamSubhead * escalaGeral * lhSubhead;
-  const alturaTagline = tamTagline * escalaGeral * lhTagline;
+  // v7.20.11: conta linhas com quebra manual (\n) E automática por largura.
+  const larguraTexto = 1080 - 72 - 72;
+  const contarLinhas = (t: string | undefined, fontPx: number, fator = 0.56) => {
+    const s = String(t || "");
+    if (!s.trim()) return 1;
+    const cpl = Math.max(1, Math.floor(larguraTexto / (fontPx * fator)));
+    return s
+      .split("\n")
+      .reduce((acc, ln) => acc + Math.max(1, Math.ceil(ln.trim().length / cpl)), 0);
+  };
+  const alturaHeadline =
+    tamHeadline * escalaGeral * lhHeadline *
+    contarLinhas(slide.headline, tamHeadline * escalaGeral);
+  const alturaSubhead =
+    tamSubhead * escalaGeral * lhSubhead *
+    contarLinhas(slide.subhead, tamSubhead * escalaGeral);
+  const alturaTagline =
+    tamTagline * escalaGeral * lhTagline *
+    contarLinhas(slide.tagline, tamTagline * escalaGeral);
 
   const yTagline = temTagline ? yCTA - gapTaglineCTA - mbTagline - alturaTagline : null;
   const ySubhead = temTagline
@@ -134,7 +150,7 @@ export default function TemplateStoriesIconeCta({
           src={slide.fotoUrl}
           width={1080 * escala}
           height={1920 * escala}
-          zoom={slide.fotoZoom ?? 1}
+          zoom={slide.fotoZoom ?? 1.25}
           offsetX={slide.fotoOffsetX ?? 0}
           offsetY={slide.fotoOffsetY ?? 0}
           onPositionChange={
@@ -142,6 +158,7 @@ export default function TemplateStoriesIconeCta({
               ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y })
               : undefined
           }
+          onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
         />
         ) : (
           <div
@@ -175,6 +192,20 @@ export default function TemplateStoriesIconeCta({
         alturaUtil={alturaUtil}
         alturaTotal={1920}
         escala={escala}
+      />
+
+      {/* v7.20.14: scrim de leitura por baixo do texto */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: e(1920 * 0.7),
+          background:
+            "linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.60) 26%, rgba(0,0,0,0.32) 58%, rgba(0,0,0,0) 100%)",
+          pointerEvents: "none",
+        }}
       />
 {/* BLOCO DE TEXTO (com offsetY pra ajuste fino) */}
 <BlocoTextoWrapper offsetY={slide.offsetYBloco} escala={escala}>

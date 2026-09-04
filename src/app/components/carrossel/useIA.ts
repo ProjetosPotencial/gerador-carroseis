@@ -48,7 +48,7 @@ export function useIA({
 }: UseIAOptions): UseIAReturn {
   const [temaIA, setTemaIA] = useState("");
   const [respostaIA, setRespostaIA] = useState("");
-  const [modeloIA, setModeloIA] = useState("anthropic/claude-3.5-sonnet");
+  const [modeloIA, setModeloIA] = useState("anthropic/claude-sonnet-4.5");
   const [promptCopiado, setPromptCopiado] = useState(false);
   const [gerandoViaAPI, setGerandoViaAPI] = useState(false);
 

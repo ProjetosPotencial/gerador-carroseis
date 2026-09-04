@@ -1,4 +1,4 @@
-import { toPng } from "html-to-image";
+import { toPng, getFontEmbedCSS } from "html-to-image";
 import JSZip from "jszip";
 
 /**
@@ -13,6 +13,25 @@ import JSZip from "jszip";
  *  - Funciona pra Feed (1080x1350), Stories (1080x1920), ou qualquer
  *    futuro formato sem precisar tocar nesse arquivo.
  */
+
+// v7.20.2: pré-computa o CSS das fontes UMA vez (com timeout de segurança).
+// Antes, o html-to-image tentava baixar+embutir dezenas de arquivos do Google
+// Fonts (cross-origin) em CADA slide — o que travava o "Salvar slides" no slide 1.
+// Agora computa 1x, cacheia, e reusa em todos os slides. Se travar/demorar,
+// cai pra "" (fontes já carregadas na página são usadas na rasterização).
+let _fontCssCache: string | null = null;
+export async function fontCssUmaVez(): Promise<string> {
+  if (_fontCssCache !== null) return _fontCssCache;
+  try {
+    _fontCssCache = await Promise.race([
+      getFontEmbedCSS(document.body),
+      new Promise<string>((_, rej) => setTimeout(() => rej(new Error("timeout")), 20000)),
+    ]);
+  } catch {
+    _fontCssCache = "";
+  }
+  return _fontCssCache;
+}
 
 /** Pré-carrega uma imagem forçando CORS anônimo. */
 function preloadImage(src: string): Promise<void> {
@@ -42,12 +61,13 @@ async function preloadAllImages(container: HTMLElement): Promise<void> {
  * usar 1080x1350 fixo. Multiplica pelo pixelRatio pra exportar sempre
  * em 1080 de largura (e altura proporcional, ex: 1350 feed, 1920 stories).
  */
-async function gerarSlideDataURL(elemento: HTMLElement): Promise<string> {
+export async function gerarSlideDataURL(elemento: HTMLElement): Promise<string> {
   await document.fonts.ready;
   await preloadAllImages(elemento);
   await new Promise((resolve) => requestAnimationFrame(resolve));
 
   // Dimensões REAIS do elemento renderizado (em px de tela, com escala aplicada)
+  const fontEmbedCSS = await fontCssUmaVez();
   const rect = elemento.getBoundingClientRect();
   const larguraTela = rect.width;
   const alturaTela = rect.height;
@@ -66,7 +86,7 @@ async function gerarSlideDataURL(elemento: HTMLElement): Promise<string> {
     canvasWidth: LARGURA_FINAL,
     canvasHeight: alturaFinal,
     backgroundColor: "#0a0a0a",
-    skipFonts: false,
+    fontEmbedCSS,
     fetchRequestInit: {
       cache: "no-cache",
       mode: "cors",
@@ -152,9 +172,16 @@ export async function baixarCarrosselZIP(opcoes: GerarCarrosselOpcoes): Promise<
       const { index, element } = slides[i];
       onProgress?.(i + 1, slides.length);
 
-      const dataUrl = await gerarSlideDataURL(element);
+      // v7.20.3: isola o slide da captura (esconde os outros) p/ toPng rápido.
+      slides.forEach((sl, j) => { if (j !== i) sl.element.style.display = "none"; });
+      let dataUrl: string;
+      try {
+        dataUrl = await gerarSlideDataURL(element);
+      } finally {
+        slides.forEach((sl) => { sl.element.style.display = ""; });
+      }
       const blob = dataUrlToBlob(dataUrl);
-      const nomeSlide = `slide_${String(index + 1).padStart(2, "0")}.png`;
+      const nomeSlide = `slide-${index + 1}.png`;
       pasta.file(nomeSlide, blob);
     }
 

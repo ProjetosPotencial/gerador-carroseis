@@ -1,3 +1,4 @@
+import { useRef, useState, useLayoutEffect } from "react";
 import type { FeedSlideData } from "./tipos";
 import {
   PARCELE_AQUI_CORES,
@@ -12,9 +13,11 @@ import BlocoTextoWrapper from "../components/BlocoTextoWrapper";
 import FotoDraggable from "../components/FotoDraggable";
 
 /**
- * Template "Pílula + Headline grande" — Stories 1080×1920 (v7.7.7)
+ * Template "Pílula + Headline grande" — Stories 1080×1920
  *
- * v7.7.7: foto cobre 100% da peça (vai atrás do rodapé via alpha).
+ * v7.20.12: bloco de texto em FLUXO NATURAL (flex column) ancorado por
+ * topo fixo + medição real via useLayoutEffect (sobe se fosse invadir o
+ * rodapé). Corrige headline multi-linha encavalando subhead.
  */
 export default function TemplateStoriesPilulaHeadline({
   slide,
@@ -38,25 +41,36 @@ export default function TemplateStoriesPilulaHeadline({
   const alturaRodape = obterAlturaRodape(tipoRodape, "stories");
   const alturaUtil = 1920 - alturaRodape;
 
-  const mostrarTextura = slide.mostrarTextura !== false;
+  const mostrarTextura = slide.mostrarTextura === true;
   const opacidadeTextura = slide.opacidadeTextura ?? 0.75;
   const modoTextura = slide.modoTextura ?? "overlay";
 
   const mostrarGradiente = slide.mostrarGradienteLeitura ?? true;
   const opacidadeGradiente = slide.opacidadeGradienteLeitura ?? 0.5;
 
-  // Entrelinhas — v7.7.9
-  const lhHeadline = slide.lineHeightHeadline ?? 0.92;
+  // v7.22 tipografia igualada ao feed
+  const lhHeadline = slide.lineHeightHeadline ?? 0.95;
   const lhSubhead = slide.lineHeightSubhead ?? 1.0;
   const lhTagline = slide.lineHeightTagline ?? 1.2;
 
-  // Margem inferior — v7.7.14
-  const mbPilula = slide.mbPilula ?? 0;
-  const mbHeadline = slide.mbHeadline ?? 0;
-  const mbSubhead = slide.mbSubhead ?? 0;
-  const topHeadline = 992 + mbPilula;
-  const topSubhead = 1177 + mbPilula + mbHeadline;
-  const topTagline = 1340 + mbPilula + mbHeadline + mbSubhead;
+  const topAnchor = 900 + (slide.mbPilula ?? 0);
+  const gapPilulaHeadline = 18;
+  const gapHeadlineSubhead = 14 + (slide.mbHeadline ?? 0);
+  const gapSubheadTagline = 36 + (slide.mbSubhead ?? 0);
+  const margemRodape = 40;
+  const limiteInferior = alturaUtil - margemRodape;
+
+  const blocoRef = useRef<HTMLDivElement>(null);
+  const [shiftUp, setShiftUp] = useState(0);
+  useLayoutEffect(() => {
+    const el = blocoRef.current;
+    if (!el) return;
+    const alturaBloco = el.offsetHeight / escala;
+    const fundo = topAnchor + alturaBloco;
+    const overflow = fundo - limiteInferior;
+    const novo = overflow > 0 ? Math.min(overflow, topAnchor - 60) : 0;
+    setShiftUp((prev) => (Math.abs(prev - novo) > 0.5 ? novo : prev));
+  });
 
   return (
     <div
@@ -69,13 +83,12 @@ export default function TemplateStoriesPilulaHeadline({
         overflow: "hidden",
       }}
     >
-      {/* FOTO 100% (atrás do rodapé) */}
       {slide.fotoUrl ? (
         <FotoDraggable
           src={slide.fotoUrl}
           width={1080 * escala}
           height={1920 * escala}
-          zoom={slide.fotoZoom ?? 1}
+          zoom={slide.fotoZoom ?? 1.25}
           offsetX={slide.fotoOffsetX ?? 0}
           offsetY={slide.fotoOffsetY ?? 0}
           onPositionChange={
@@ -83,6 +96,7 @@ export default function TemplateStoriesPilulaHeadline({
               ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y })
               : undefined
           }
+          onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
         />
       ) : (
         <div
@@ -119,108 +133,106 @@ export default function TemplateStoriesPilulaHeadline({
         alturaTotal={1920}
         escala={escala}
       />
-{/* BLOCO DE TEXTO (com offsetY pra ajuste fino) */}
-<BlocoTextoWrapper offsetY={slide.offsetYBloco} escala={escala}>
 
-      {slide.mostrarPilula !== false && slide.pilula && (
+      <BlocoTextoWrapper offsetY={slide.offsetYBloco} escala={escala}>
         <div
+          ref={blocoRef}
           style={{
             position: "absolute",
-            top: e(921),
-            left: e(141),
-            backgroundColor: slide.corPilulaFundo || corPilulaFundo,
-            borderRadius: e(24.5),
-            color: slide.corPilula || corPilulaTexto,
-            fontSize: e((slide.tamPilula ?? 32) * escalaGeral),
-            fontWeight: slide.pesoPilula ?? 700,
-            fontStyle: slide.italicPilula ? "italic" : "normal",
-            letterSpacing: `${slide.letterSpacingPilula ?? -0.005}em`,
-            textTransform: slide.transformPilula ?? "none",
-            textAlign: slide.alignPilula ?? "left",
-            whiteSpace: "nowrap",
-            paddingTop: e(14),
-            paddingBottom: e(11),
-            paddingLeft: e(28),
-            paddingRight: e(28),
-            lineHeight: slide.lineHeightPilula ?? 1.0,
-            display: "inline-block",
-            maxWidth: e(800),
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            boxSizing: "border-box",
-          }}
-        >
-          {slide.pilula}
-        </div>
-      )}
-
-      {slide.headline && (
-        <div
-          style={{
-            position: "absolute",
-            top: e(topHeadline),
+            top: e(topAnchor - shiftUp),
             left: e(140),
             right: e(140),
-            color: corHeadline,
-            fontSize: e((slide.tamHeadline ?? 180) * escalaGeral),
-            fontWeight: slide.pesoHeadline ?? 900,
-            fontStyle: slide.italicHeadline ? "italic" : "normal",
-            lineHeight: lhHeadline,
-            letterSpacing: `${slide.letterSpacingHeadline ?? -0.045}em`,
-            textTransform: slide.transformHeadline ?? "none",
-            textAlign: slide.alignHeadline ?? "left",
-            whiteSpace: "pre-line",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "stretch",
           }}
         >
-          {slide.headline}
-        </div>
-      )}
+          {slide.mostrarPilula !== false && slide.pilula && (
+            <div
+              style={{
+                alignSelf: "flex-start",
+                backgroundColor: slide.corPilulaFundo || corPilulaFundo,
+                borderRadius: e(24.5),
+                color: slide.corPilula || corPilulaTexto,
+                fontSize: e((slide.tamPilula ?? 24) * escalaGeral),
+                fontWeight: slide.pesoPilula ?? 700,
+                fontStyle: slide.italicPilula ? "italic" : "normal",
+                letterSpacing: `${slide.letterSpacingPilula ?? -0.005}em`,
+                textTransform: slide.transformPilula ?? "none",
+                whiteSpace: "nowrap",
+                paddingTop: e(14),
+                paddingBottom: e(11),
+                paddingLeft: e(28),
+                paddingRight: e(28),
+                lineHeight: slide.lineHeightPilula ?? 1.0,
+                maxWidth: e(800),
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                boxSizing: "border-box",
+              }}
+            >
+              {slide.pilula}
+            </div>
+          )}
 
-      {slide.subhead && (
-        <div
-          style={{
-            position: "absolute",
-            top: e(topSubhead),
-            left: e(140),
-            right: e(140),
-            color: corSubhead,
-            fontSize: e((slide.tamSubhead ?? 76) * escalaGeral),
-            fontWeight: slide.pesoSubhead ?? 700,
-            fontStyle: slide.italicSubhead ? "italic" : "normal",
-            lineHeight: lhSubhead,
-            letterSpacing: `${slide.letterSpacingSubhead ?? -0.025}em`,
-            textTransform: slide.transformSubhead ?? "none",
-            textAlign: slide.alignSubhead ?? "right",
-            whiteSpace: "pre-line",
-          }}
-        >
-          {slide.subhead}
-        </div>
-      )}
+          {slide.headline && (
+            <div
+              style={{
+                marginTop: e(gapPilulaHeadline),
+                color: corHeadline,
+                fontSize: e((slide.tamHeadline ?? 165) * escalaGeral),
+                fontWeight: slide.pesoHeadline ?? 800,
+                fontStyle: slide.italicHeadline ? "italic" : "normal",
+                lineHeight: lhHeadline,
+                letterSpacing: `${slide.letterSpacingHeadline ?? -0.04}em`,
+                textTransform: slide.transformHeadline ?? "none",
+                textAlign: slide.alignHeadline ?? "left",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {slide.headline}
+            </div>
+          )}
 
-      {slide.tagline && (
-        <div
-          style={{
-            position: "absolute",
-            top: e(topTagline),
-            left: e(140),
-            right: e(140),
-            color: corSubhead,
-            fontSize: e((slide.tamTagline ?? 40) * escalaGeral),
-            fontWeight: slide.pesoTagline ?? 700,
-            fontStyle: slide.italicTagline ? "italic" : "normal",
-            lineHeight: lhTagline,
-            letterSpacing: `${slide.letterSpacingTagline ?? -0.005}em`,
-            textTransform: slide.transformTagline ?? "none",
-            textAlign: slide.alignTagline ?? "left",
-            whiteSpace: "pre-line",
-          }}
-        >
-          {slide.tagline}
-        </div>
-      )}
-</BlocoTextoWrapper>
+          {slide.subhead && (
+            <div
+              style={{
+                marginTop: e(gapHeadlineSubhead),
+                color: corSubhead,
+                fontSize: e((slide.tamSubhead ?? 72) * escalaGeral),
+                fontWeight: slide.pesoSubhead ?? 500,
+                fontStyle: slide.italicSubhead ? "italic" : "normal",
+                lineHeight: lhSubhead,
+                letterSpacing: `${slide.letterSpacingSubhead ?? -0.02}em`,
+                textTransform: slide.transformSubhead ?? "none",
+                textAlign: slide.alignSubhead ?? "right",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {slide.subhead}
+            </div>
+          )}
 
+          {slide.tagline && (
+            <div
+              style={{
+                marginTop: e(gapSubheadTagline),
+                color: corSubhead,
+                fontSize: e((slide.tamTagline ?? 38) * escalaGeral),
+                fontWeight: slide.pesoTagline ?? 600,
+                fontStyle: slide.italicTagline ? "italic" : "normal",
+                lineHeight: lhTagline,
+                letterSpacing: `${slide.letterSpacingTagline ?? -0.01}em`,
+                textTransform: slide.transformTagline ?? "none",
+                textAlign: slide.alignTagline ?? "left",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {slide.tagline}
+            </div>
+          )}
+        </div>
+      </BlocoTextoWrapper>
 
       {slide.mostrarFooter !== false && (
         <RodapePNG tipo={tipoRodape} formato="stories" escala={escala} />

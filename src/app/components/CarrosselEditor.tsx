@@ -1,12 +1,17 @@
 import { useState, useRef, useMemo, useCallback } from "react";
+import { Loader2, X } from "lucide-react";
 import CarrosselSlide from "./CarrosselSlide";
 import { TEMAS_DISPONIVEIS, obterTema } from "./temas";
-import { ErroParseTexto, parsearTextoColado, sincronizarSlides } from "../lib/parsearTextoColado";
-import { baixarCarrosselZIP, baixarSlideUnico } from "../lib/gerarCarrossel";
+import { ErroParseTexto, parsearTextoColado, aplicarNaEstrutura } from "../lib/parsearTextoColado";
+import { baixarCarrosselZIP, baixarSlideUnico, gerarSlideDataURL } from "../lib/gerarCarrossel";
+import { authHeaders } from "../lib/supabaseClient";
 import {
   useSlides,
   useStatus,
   useIA,
+  useImagens,
+  inverterCoresDeck,
+  proximaEstruturaPadrao,
   Toolbar,
   StatusBar,
   SlideList,
@@ -14,6 +19,9 @@ import {
   EditPanel,
   IAPanel,
   PastePanel,
+  EstiloVisualPanel,
+  BancoPanel,
+  AgendaPanel,
 } from "./carrossel";
 import type { LayoutId, TemaId } from "./temas/tipos";
 
@@ -29,6 +37,9 @@ export default function CarrosselEditor() {
   const [marca, setMarca] = useState("POTENCIAL · MERCADO");
   const [mostrarPainelIA, setMostrarPainelIA] = useState(false);
   const [mostrarPainelCola, setMostrarPainelCola] = useState(false);
+  const [mostrarPainelEstilo, setMostrarPainelEstilo] = useState(false);
+  const [mostrarPainelBanco, setMostrarPainelBanco] = useState(false);
+  const [mostrarPainelAgenda, setMostrarPainelAgenda] = useState(false);
   const [textoColado, setTextoColado] = useState("");
 
   // Hooks customizados
@@ -42,6 +53,13 @@ export default function CarrosselEditor() {
     marca,
     temaAtivo,
     status,
+  });
+  const img = useImagens({
+    slides: sl.slides,
+    setSlides: sl.setSlides,
+    formato: "carrossel",
+    status,
+    rotularSlide: (s) => s.kicker || s.headline || "",
   });
 
   // Refs dos slides em escala real (pra captura via html-to-image)
@@ -73,19 +91,18 @@ export default function CarrosselEditor() {
     }
     try {
       const { slides: novosSlides, avisos } = parsearTextoColado(textoColado);
-      const slidesFinais = sincronizarSlides(sl.slides, novosSlides);
+      // v7.9.1: cada colagem reseta pra estrutura padrão na PRÓXIMA cor (alternada)
+      // e encaixa o texto colado nela — sem preservar o deck/fotos anteriores.
+      const base = proximaEstruturaPadrao(temaId);
+      const slidesFinais = aplicarNaEstrutura(base, novosSlides);
       sl.setSlides(slidesFinais);
       sl.setIndiceAtivo(0);
       setMostrarPainelCola(false);
       setTextoColado("");
 
-      const numAdicionados = Math.max(0, novosSlides.length - sl.slides.length);
-      const numRemovidos = Math.max(0, sl.slides.length - novosSlides.length);
       let msg = `${novosSlides.length} ${
         novosSlides.length === 1 ? "slide aplicado" : "slides aplicados"
-      }`;
-      if (numAdicionados > 0) msg += ` (+${numAdicionados} novos)`;
-      if (numRemovidos > 0) msg += ` (-${numRemovidos} removidos)`;
+      } na estrutura padrão (cores da vez)`;
       if (avisos.length > 0)
         msg += ` · ${avisos.length} ${avisos.length === 1 ? "aviso" : "avisos"}`;
 
@@ -98,20 +115,24 @@ export default function CarrosselEditor() {
           : err?.message || "Erro ao processar o texto.";
       status.erro(msg);
     }
-  }, [textoColado, sl, status]);
+  }, [textoColado, sl, status, temaId]);
 
   // Nome do arquivo ZIP baseado na primeira headline
-  const nomeArquivoZip = useMemo(() => {
-    const primeira = sl.slides[0]?.headline || "carrossel";
-    const slug = primeira
+  const slug = (t: string) =>
+    (t || "")
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 40);
-    return `carrossel-${slug || "novo"}`;
-  }, [sl.slides]);
+  const nomeArquivoZip = useMemo(() => {
+    // Bloco 5: nomeia por ${mes}-${semana}-${peca} quando o Banco está preenchido.
+    const partes = [img.banco.mes, img.banco.semana, img.banco.peca].map(slug).filter(Boolean);
+    if (partes.length) return partes.join("-");
+    const primeira = sl.slides[0]?.headline || "carrossel";
+    return `carrossel-${slug(primeira) || "novo"}`;
+  }, [sl.slides, img.banco.mes, img.banco.semana, img.banco.peca]);
 
   // ====== EXPORT ======
   const exportarTudo = async () => {
@@ -137,6 +158,78 @@ export default function CarrosselEditor() {
     });
   };
 
+  // ====== SALVAR SLIDES FINAIS (bucket slides-finais no Supabase) ======
+  const [salvando, setSalvando] = useState(false);
+  const salvarSlides = async () => {
+    const refs = sl.slides
+      .map((s, i) => {
+        const element = slideRefs.current.get(s.id);
+        return element ? { index: i, element } : null;
+      })
+      .filter((r): r is { index: number; element: HTMLDivElement } => r !== null);
+    if (refs.length !== sl.slides.length) {
+      status.erro("Alguns slides não estão prontos ainda. Tente em 1-2 segundos.");
+      return;
+    }
+    setSalvando(true);
+    status.exportando(0, refs.length);
+    const meta = {
+      mes: img.banco.mes,
+      semana: img.banco.semana,
+      peca: img.banco.peca || "Carrossel",
+    };
+    let ok = 0;
+    let caminho = "";
+    const urls: { n: number; url: string }[] = [];
+    try {
+      for (let i = 0; i < refs.length; i++) {
+        status.exportando(i + 1, refs.length);
+        // v7.20.3: isola o slide da captura. Com os 7 slides em resolução real
+        // no DOM, o getComputedStyle do html-to-image forçava reflow e o toPng
+        // levava >12s/slide (travava). Escondendo os demais, cada captura é rápida.
+        refs.forEach((r, j) => { if (j !== i) r.element.style.display = "none"; });
+        let dataUrl: string;
+        try {
+          dataUrl = await gerarSlideDataURL(refs[i].element);
+        } finally {
+          refs.forEach((r) => { r.element.style.display = ""; });
+        }
+        const r = await fetch("/api/slides/salvar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+          body: JSON.stringify({ png: dataUrl, ...meta, slide: i + 1 }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (data.configured === false) {
+          status.erro("Repositório não configurado (defina as variáveis SUPABASE_* na Vercel).");
+          setSalvando(false);
+          return;
+        }
+        if (!r.ok || data.error) throw new Error(data.error || `Erro HTTP ${r.status}`);
+        caminho = data.caminho || caminho;
+        if (data.url) urls.push({ n: i + 1, url: data.url });
+        ok++;
+      }
+      status.sucesso(`${ok} ${ok === 1 ? "slide salvo" : "slides salvos"} em ${caminho || "slides-finais"}.`, 5000);
+      // v7.20: copia as artes pra pasta da semana no Drive + Slack de aprovação
+      try {
+        const rf = await fetch("/api/slides/finalizar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+          body: JSON.stringify({ ...meta, slides: urls }),
+        });
+        const df = await rf.json().catch(() => ({}));
+        if (df && df.configured !== false && df.driveUrl) {
+          status.sucesso(`Artes salvas no Drive (${df.salvos}). Link enviado no Slack pra aprovação.`, 7000);
+        }
+      } catch {}
+    } catch (e: any) {
+      status.erro(e?.message || "Falha ao salvar os slides.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const exportarSlideAtual = async () => {
     const element = slideRefs.current.get(sl.slideAtivo.id);
     if (!element) {
@@ -156,12 +249,79 @@ export default function CarrosselEditor() {
   // ====== Helpers de UI ======
   const togglePainelCola = () => {
     setMostrarPainelCola((v) => !v);
-    if (!mostrarPainelCola) setMostrarPainelIA(false);
+    if (!mostrarPainelCola) {
+      setMostrarPainelIA(false);
+      setMostrarPainelEstilo(false);
+      setMostrarPainelBanco(false);
+      setMostrarPainelAgenda(false);
+    }
   };
 
   const togglePainelIA = () => {
     setMostrarPainelIA((v) => !v);
-    if (!mostrarPainelIA) setMostrarPainelCola(false);
+    if (!mostrarPainelIA) {
+      setMostrarPainelCola(false);
+      setMostrarPainelEstilo(false);
+      setMostrarPainelBanco(false);
+      setMostrarPainelAgenda(false);
+    }
+  };
+
+  const togglePainelEstilo = () => {
+    setMostrarPainelEstilo((v) => !v);
+    if (!mostrarPainelEstilo) {
+      setMostrarPainelCola(false);
+      setMostrarPainelIA(false);
+      setMostrarPainelBanco(false);
+      setMostrarPainelAgenda(false);
+    }
+  };
+
+  const togglePainelBanco = () => {
+    setMostrarPainelBanco((v) => !v);
+    if (!mostrarPainelBanco) {
+      setMostrarPainelCola(false);
+      setMostrarPainelIA(false);
+      setMostrarPainelEstilo(false);
+      setMostrarPainelAgenda(false);
+    }
+  };
+
+  const togglePainelAgenda = () => {
+    setMostrarPainelAgenda((v) => !v);
+    if (!mostrarPainelAgenda) {
+      setMostrarPainelCola(false);
+      setMostrarPainelIA(false);
+      setMostrarPainelEstilo(false);
+      setMostrarPainelBanco(false);
+    }
+  };
+
+  // Reuso do banco de imagens: aplica a URL pública no slide ativo (sem Gemini).
+  const usarImagemNoSlide = useCallback(
+    (url: string) => {
+      sl.setSlides((lista) =>
+        lista.map((s, i) =>
+          i === sl.indiceAtivo
+            ? { ...s, fotoUrl: url, fotoOrigem: "ia", imgStatus: "ok", imgErro: undefined }
+            : s
+        )
+      );
+      status.sucesso(`Imagem aplicada ao slide ${sl.indiceAtivo + 1}.`, 3000);
+    },
+    [sl, status]
+  );
+
+  const inverterCores = () => {
+    sl.setSlides((lista) => inverterCoresDeck(lista));
+    status.sucesso("Cores invertidas (preto ⇄ amarelo).", 2000);
+  };
+
+  const resetarEstruturaPadrao = () => {
+    if (window.confirm("Isso apaga os slides atuais e recarrega a estrutura padrão de 7 slides. Continuar?")) {
+      sl.limparTudo(temaId);
+      status.sucesso("Estrutura padrão recarregada (7 slides).", 2500);
+    }
   };
 
   const nomeLayoutPorId = (id: string) =>
@@ -184,7 +344,68 @@ export default function CarrosselEditor() {
           onTogglePainelIA={togglePainelIA}
           onExportarSlideAtual={exportarSlideAtual}
           onExportarTudo={exportarTudo}
+          onSalvarSlides={salvarSlides}
+          salvando={salvando}
+          mostrarPainelEstilo={mostrarPainelEstilo}
+          onTogglePainelEstilo={togglePainelEstilo}
+          mostrarPainelBanco={mostrarPainelBanco}
+          onTogglePainelBanco={togglePainelBanco}
+          mostrarPainelAgenda={mostrarPainelAgenda}
+          onTogglePainelAgenda={togglePainelAgenda}
+          onGerarImagens={img.gerarLote}
+          gerandoImagens={img.gerandoLote}
+          progressoImagens={img.progresso}
+          slidesPendentes={img.slidesPendentes}
+          onInverterCores={inverterCores}
+          onLimparTudo={resetarEstruturaPadrao}
         />
+
+        {mostrarPainelEstilo && (
+          <EstiloVisualPanel img={img} onFechar={() => setMostrarPainelEstilo(false)} />
+        )}
+
+        {mostrarPainelBanco && (
+          <BancoPanel
+            img={img}
+            onFechar={() => setMostrarPainelBanco(false)}
+            onUsarNoSlide={usarImagemNoSlide}
+            slideAtivoNum={sl.indiceAtivo + 1}
+          />
+        )}
+
+        {mostrarPainelAgenda && (
+          <AgendaPanel
+            mes={img.banco.mes}
+            semana={img.banco.semana}
+            onFechar={() => setMostrarPainelAgenda(false)}
+          />
+        )}
+
+        {img.gerandoLote && img.progresso && (
+          <div className="bg-[#141414] border border-[#FFC528]/30 rounded-xl p-4 flex items-center gap-4">
+            <Loader2 className="animate-spin text-[#FFC528] flex-shrink-0" size={20} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1 gap-3">
+                <span className="text-sm font-bold text-white">
+                  Gerando imagem {img.progresso.atual} de {img.progresso.total}
+                </span>
+                <span className="text-xs text-gray-400 truncate">{img.progresso.rotulo}</span>
+              </div>
+              <div className="w-full h-2 bg-[#0a0a0a] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#FFC528] transition-all"
+                  style={{ width: `${Math.round((img.progresso.atual / img.progresso.total) * 100)}%` }}
+                />
+              </div>
+            </div>
+            <button
+              onClick={img.cancelarLote}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-bold bg-[#1a1a1a] border border-gray-700 text-gray-300 hover:border-red-500 hover:text-red-400 transition-all flex-shrink-0"
+            >
+              <X size={16} /> Cancelar
+            </button>
+          </div>
+        )}
 
         {mostrarPainelIA && (
           <IAPanel
@@ -264,6 +485,7 @@ export default function CarrosselEditor() {
                 temaId={temaId}
                 onTrocarTema={trocarTema}
                 temaAtivo={temaAtivo}
+                onGerarImagem={(forcar) => img.gerarSlide(sl.slideAtivo.id, { forcar })}
               />
             </div>
           </aside>

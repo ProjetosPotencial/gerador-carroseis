@@ -1,3 +1,4 @@
+import { useRef, useState, useLayoutEffect } from "react";
 import type { FeedSlideData } from "./tipos";
 import {
   PARCELE_AQUI_CORES,
@@ -12,17 +13,15 @@ import BlocoTextoWrapper from "../components/BlocoTextoWrapper";
 import FotoDraggable from "../components/FotoDraggable";
 
 /**
- * Template "Pílula + Headline grande" — Feed 1080×1350 (v7.7.7)
+ * Template "Pílula + Headline grande" — Feed 1080×1350
  *
- * v7.7.7:
- *  - Foto cobre 100% da peça (vai atrás do rodapé via alpha) — elimina faixa
- *    preta lateral que aparecia com rodape_01 amarelo.
- *  - Textos com posições absolutas (layout fixo do Figma) preservados.
- *
- * v7.7.20:
- *  - Foto agora usa FotoDraggable: drag direto + zoom 1x-3x quando
- *    onSlideChange é fornecido (modo editor). No export sem onSlideChange,
- *    drag é desativado mas posição salva é renderizada normalmente.
+ * v7.20.12: layout do bloco de texto agora é FLUXO NATURAL (flex column)
+ * ancorado por um topo fixo (preserva o enquadramento aprovado p/ textos
+ * curtos) + medição real da altura via useLayoutEffect. Se o texto for
+ * longo e fosse invadir o rodapé, o bloco inteiro sobe o suficiente pra
+ * caber (sem cortar e sem encavalar). Antes as posições eram absolutas e
+ * fixas, então headline/subhead multi-linha encavalavam e a tagline
+ * transbordava pro rodapé.
  */
 export default function TemplateFeedPilulaHeadline({
   slide,
@@ -46,26 +45,39 @@ export default function TemplateFeedPilulaHeadline({
   const alturaRodape = obterAlturaRodape(tipoRodape, "feed");
   const alturaUtil = 1350 - alturaRodape;
 
-  const mostrarTextura = slide.mostrarTextura !== false;
+  const mostrarTextura = slide.mostrarTextura === true;
   const opacidadeTextura = slide.opacidadeTextura ?? 0.75;
   const modoTextura = slide.modoTextura ?? "overlay";
 
   const mostrarGradiente = slide.mostrarGradienteLeitura ?? true;
   const opacidadeGradiente = slide.opacidadeGradienteLeitura ?? 0.5;
 
-  // Entrelinhas — v7.7.9 (defaults preservam visual original do template)
+  // Entrelinhas
   const lhHeadline = slide.lineHeightHeadline ?? 0.95;
   const lhSubhead = slide.lineHeightSubhead ?? 1.0;
   const lhTagline = slide.lineHeightTagline ?? 1.2;
 
-  // Margem inferior — v7.7.14 (empurra elementos subsequentes pra baixo cumulativamente)
-  const mbPilula = slide.mbPilula ?? 0;
-  const mbHeadline = slide.mbHeadline ?? 0;
-  const mbSubhead = slide.mbSubhead ?? 0;
-  // Posições com cumulativo
-  const topHeadline = 560 + mbPilula;
-  const topSubhead = 740 + mbPilula + mbHeadline;
-  const topTagline = 905 + mbPilula + mbHeadline + mbSubhead;
+  // Bloco de texto: topo âncora fixo (px em coords 1080x1350) + gaps.
+  const topAnchor = 470 + (slide.mbPilula ?? 0);
+  const gapPilulaHeadline = 18;
+  const gapHeadlineSubhead = 14 + (slide.mbHeadline ?? 0);
+  const gapSubheadTagline = 36 + (slide.mbSubhead ?? 0);
+  // Margem mínima acima do rodapé (creme) — o texto não deve invadir.
+  const margemRodape = 28;
+  const limiteInferior = alturaUtil - margemRodape;
+
+  // Medição real: se o bloco (topo + altura) passar do limite, sobe.
+  const blocoRef = useRef<HTMLDivElement>(null);
+  const [shiftUp, setShiftUp] = useState(0);
+  useLayoutEffect(() => {
+    const el = blocoRef.current;
+    if (!el) return;
+    const alturaBloco = el.offsetHeight / escala; // volta p/ coords 1080
+    const fundo = topAnchor + alturaBloco;
+    const overflow = fundo - limiteInferior;
+    const novo = overflow > 0 ? Math.min(overflow, topAnchor - 40) : 0;
+    setShiftUp((prev) => (Math.abs(prev - novo) > 0.5 ? novo : prev));
+  });
 
   return (
     <div
@@ -78,7 +90,6 @@ export default function TemplateFeedPilulaHeadline({
         overflow: "hidden",
       }}
     >
-      {/* FOTO 100% (vai atrás do rodapé) — v7.7.20: drag + zoom */}
       {slide.fotoUrl ? (
         <FotoDraggable
           src={slide.fotoUrl}
@@ -92,6 +103,7 @@ export default function TemplateFeedPilulaHeadline({
               ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y })
               : undefined
           }
+          onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
         />
       ) : (
         <div
@@ -115,7 +127,6 @@ export default function TemplateFeedPilulaHeadline({
         </div>
       )}
 
-      {/* TEXTURA (cobre 100% — fica encoberta pelo rodapé opaco) */}
       <TexturaOverlay
         visivel={mostrarTextura}
         opacity={opacidadeTextura}
@@ -124,7 +135,6 @@ export default function TemplateFeedPilulaHeadline({
         escala={escala}
       />
 
-      {/* GRADIENTE DE LEITURA (cobre 100%, pico em alturaUtil) */}
       <GradienteLeitura
         visivel={mostrarGradiente}
         opacidade={opacidadeGradiente}
@@ -133,112 +143,106 @@ export default function TemplateFeedPilulaHeadline({
         escala={escala}
       />
 
-      {/* BLOCO DE TEXTO (com offsetY pra ajuste fino) */}
       <BlocoTextoWrapper offsetY={slide.offsetYBloco} escala={escala}>
-      {/* PÍLULA */}
-      {slide.mostrarPilula !== false && slide.pilula && (
         <div
+          ref={blocoRef}
           style={{
             position: "absolute",
-            top: e(489),
-            left: e(148),
-            backgroundColor: slide.corPilulaFundo || corPilulaFundo,
-            borderRadius: e(24.5),
-            color: slide.corPilula || corPilulaTexto,
-            fontSize: e((slide.tamPilula ?? 24) * escalaGeral),
-            fontWeight: slide.pesoPilula ?? 700,
-            fontStyle: slide.italicPilula ? "italic" : "normal",
-            letterSpacing: `${slide.letterSpacingPilula ?? -0.005}em`,
-            textTransform: slide.transformPilula ?? "none",
-            textAlign: slide.alignPilula ?? "left",
-            whiteSpace: "nowrap",
-            paddingTop: e(14),
-            paddingBottom: e(11),
-            paddingLeft: e(28),
-            paddingRight: e(28),
-            lineHeight: slide.lineHeightPilula ?? 1.0,
-            display: "inline-block",
-            maxWidth: e(800),
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            boxSizing: "border-box",
-          }}
-        >
-          {slide.pilula}
-        </div>
-      )}
-
-      {/* HEADLINE */}
-      {slide.headline && (
-        <div
-          style={{
-            position: "absolute",
-            top: e(topHeadline),
+            top: e(topAnchor - shiftUp),
             left: e(140),
             right: e(140),
-            color: corHeadline,
-            fontSize: e((slide.tamHeadline ?? 165) * escalaGeral),
-            fontWeight: slide.pesoHeadline ?? 800,
-            fontStyle: slide.italicHeadline ? "italic" : "normal",
-            lineHeight: lhHeadline,
-            letterSpacing: `${slide.letterSpacingHeadline ?? -0.04}em`,
-            textTransform: slide.transformHeadline ?? "none",
-            textAlign: slide.alignHeadline ?? "left",
-            whiteSpace: "pre-line",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "stretch",
           }}
         >
-          {slide.headline}
-        </div>
-      )}
+          {slide.mostrarPilula !== false && slide.pilula && (
+            <div
+              style={{
+                alignSelf: "flex-start",
+                backgroundColor: slide.corPilulaFundo || corPilulaFundo,
+                borderRadius: e(24.5),
+                color: slide.corPilula || corPilulaTexto,
+                fontSize: e((slide.tamPilula ?? 24) * escalaGeral),
+                fontWeight: slide.pesoPilula ?? 700,
+                fontStyle: slide.italicPilula ? "italic" : "normal",
+                letterSpacing: `${slide.letterSpacingPilula ?? -0.005}em`,
+                textTransform: slide.transformPilula ?? "none",
+                whiteSpace: "nowrap",
+                paddingTop: e(14),
+                paddingBottom: e(11),
+                paddingLeft: e(28),
+                paddingRight: e(28),
+                lineHeight: slide.lineHeightPilula ?? 1.0,
+                maxWidth: e(800),
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                boxSizing: "border-box",
+              }}
+            >
+              {slide.pilula}
+            </div>
+          )}
 
-      {/* SUBHEAD */}
-      {slide.subhead && (
-        <div
-          style={{
-            position: "absolute",
-            top: e(topSubhead),
-            left: e(140),
-            right: e(140),
-            color: corSubhead,
-            fontSize: e((slide.tamSubhead ?? 72) * escalaGeral),
-            fontWeight: slide.pesoSubhead ?? 500,
-            fontStyle: slide.italicSubhead ? "italic" : "normal",
-            lineHeight: lhSubhead,
-            letterSpacing: `${slide.letterSpacingSubhead ?? -0.02}em`,
-            textTransform: slide.transformSubhead ?? "none",
-            textAlign: slide.alignSubhead ?? "right",
-            whiteSpace: "pre-line",
-          }}
-        >
-          {slide.subhead}
-        </div>
-      )}
+          {slide.headline && (
+            <div
+              style={{
+                marginTop: e(gapPilulaHeadline),
+                color: corHeadline,
+                fontSize: e((slide.tamHeadline ?? 165) * escalaGeral),
+                fontWeight: slide.pesoHeadline ?? 800,
+                fontStyle: slide.italicHeadline ? "italic" : "normal",
+                lineHeight: lhHeadline,
+                letterSpacing: `${slide.letterSpacingHeadline ?? -0.04}em`,
+                textTransform: slide.transformHeadline ?? "none",
+                textAlign: slide.alignHeadline ?? "left",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {slide.headline}
+            </div>
+          )}
 
-      {/* TAGLINE */}
-      {slide.tagline && (
-        <div
-          style={{
-            position: "absolute",
-            top: e(topTagline),
-            left: e(140),
-            right: e(140),
-            color: corSubhead,
-            fontSize: e((slide.tamTagline ?? 38) * escalaGeral),
-            fontWeight: slide.pesoTagline ?? 600,
-            fontStyle: slide.italicTagline ? "italic" : "normal",
-            lineHeight: lhTagline,
-            letterSpacing: `${slide.letterSpacingTagline ?? -0.01}em`,
-            textTransform: slide.transformTagline ?? "none",
-            textAlign: slide.alignTagline ?? "left",
-            whiteSpace: "pre-line",
-          }}
-        >
-          {slide.tagline}
+          {slide.subhead && (
+            <div
+              style={{
+                marginTop: e(gapHeadlineSubhead),
+                color: corSubhead,
+                fontSize: e((slide.tamSubhead ?? 72) * escalaGeral),
+                fontWeight: slide.pesoSubhead ?? 500,
+                fontStyle: slide.italicSubhead ? "italic" : "normal",
+                lineHeight: lhSubhead,
+                letterSpacing: `${slide.letterSpacingSubhead ?? -0.02}em`,
+                textTransform: slide.transformSubhead ?? "none",
+                textAlign: slide.alignSubhead ?? "right",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {slide.subhead}
+            </div>
+          )}
+
+          {slide.tagline && (
+            <div
+              style={{
+                marginTop: e(gapSubheadTagline),
+                color: corSubhead,
+                fontSize: e((slide.tamTagline ?? 38) * escalaGeral),
+                fontWeight: slide.pesoTagline ?? 600,
+                fontStyle: slide.italicTagline ? "italic" : "normal",
+                lineHeight: lhTagline,
+                letterSpacing: `${slide.letterSpacingTagline ?? -0.01}em`,
+                textTransform: slide.transformTagline ?? "none",
+                textAlign: slide.alignTagline ?? "left",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {slide.tagline}
+            </div>
+          )}
         </div>
-      )}
       </BlocoTextoWrapper>
 
-      {/* RODAPÉ PNG */}
       {slide.mostrarFooter !== false && (
         <RodapePNG tipo={tipoRodape} formato="feed" escala={escala} />
       )}

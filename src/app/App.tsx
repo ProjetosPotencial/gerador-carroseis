@@ -3,6 +3,7 @@ import CoverEditorAvancado from "./components/CoverEditorAvancado";
 import GeradorLote from "./components/GeradorLote";
 import CarrosselEditor from "./components/CarrosselEditor";
 import { FeedEditor } from "./components/feed";
+import SemanaEditor from "./components/SemanaEditor";
 import imgLogoGrupo from "../imports/logo_potencial_dark.png";
 import imgLogoPotencialFooter from "../imports/Logo_-_Potencial_Tecnologia_Horizontal_Negativa__2-2.png";
 import {
@@ -15,12 +16,15 @@ import {
   Sun,
   Moon,
   Image as ImageIcon,
+  CalendarRange,
 } from "lucide-react";
 import { ThemeProvider, useTheme } from "./lib/ThemeProvider";
 import { SPACING, RADIUS, FONT_WEIGHT, FONT_SIZE, TRANSITION, SHADOW } from "./lib/designSystem";
 import { Badge } from "./components/ui-premium";
+import AuthGate from "./components/AuthGate";
+import RenderView from "./components/RenderView";
 
-type Modo = "editor" | "lote" | "carrossel" | "feed";
+type Modo = "editor" | "lote" | "carrossel" | "feed" | "semana";
 
 interface ModoDef {
   id: Modo;
@@ -59,18 +63,39 @@ const MODOS: ModoDef[] = [
     icone: <ImageIcon size={14} strokeWidth={1.75} />,
     descricao: "Templates Parcele Aqui (1080×1350 / 1080×1920)",
   },
+  {
+    id: "semana",
+    categoria: "instagram",
+    label: "Semana",
+    icone: <CalendarRange size={14} strokeWidth={1.75} />,
+    descricao: "Todas as pecas da semana num lugar so",
+  },
 ];
 
 export default function App() {
+  // v7.20.4: modo render headless (?render=1) — 1 slide em 1080x1350, sem login,
+  // pra print nativo via navegador headless (captura confiável, sem html-to-image).
+  const isRender =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("render") === "1";
+  if (isRender) {
+    return (
+      <ThemeProvider>
+        <RenderView />
+      </ThemeProvider>
+    );
+  }
   return (
     <ThemeProvider>
-      <AppShell />
+      <AuthGate>
+        <AppShell />
+      </AuthGate>
     </ThemeProvider>
   );
 }
 
 function AppShell() {
-  const [modo, setModo] = useState<Modo>("editor");
+  const [modo, setModo] = useState<Modo>("semana");
   const { theme, mode, toggle } = useTheme();
 
   useEffect(() => {
@@ -98,7 +123,7 @@ function AppShell() {
           top: 0,
           zIndex: 50,
           height: 70,
-          backgroundColor: theme.mode === "dark" ? "rgba(5, 5, 5, 0.8)" : "rgba(250, 250, 248, 0.8)",
+          backgroundColor: theme.mode === "dark" ? "rgba(22, 24, 28, 0.82)" : "rgba(250, 250, 248, 0.8)",
           backdropFilter: "blur(16px) saturate(180%)",
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
           borderBottom: `1px solid ${theme.border.default}`,
@@ -246,6 +271,7 @@ function AppShell() {
         {modo === "lote" && <GeradorLote />}
         {modo === "carrossel" && <CarrosselEditor />}
         {modo === "feed" && <FeedEditor />}
+        {modo === "semana" && <SemanaEditor onAbrirEditor={setModo} />}
       </main>
 
       {/* ================ FOOTER ================ */}

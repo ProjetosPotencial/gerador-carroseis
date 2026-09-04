@@ -284,6 +284,7 @@ function LayoutTweetImagem({ slide, marca, numero, coresResolvidas, onSlideChang
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
         </div>
 
@@ -630,6 +631,7 @@ function LayoutTweetEditorialLongo({ slide, marca, numero, coresResolvidas, onSl
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
         </div>
 
@@ -758,6 +760,7 @@ function LayoutTweetFotoSandwich({ slide, marca, numero, coresResolvidas, onSlid
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
         </div>
 

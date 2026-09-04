@@ -111,15 +111,15 @@ export default function IAPanel({
             className="w-full bg-[#0f0f0f] border border-gray-800 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-[#FFC528]"
           >
             <optgroup label="💎 Premium (melhor qualidade)">
-              <option value="anthropic/claude-3.5-sonnet">
-                Claude 3.5 Sonnet (recomendado)
+              <option value="anthropic/claude-sonnet-4.5">
+                Claude Sonnet 4.5 (recomendado)
+              </option>
+              <option value="anthropic/claude-haiku-4.5">
+                Claude Haiku 4.5 (rápido e barato)
               </option>
               <option value="openai/gpt-4o">GPT-4o</option>
-              <option value="anthropic/claude-3.5-haiku">
-                Claude 3.5 Haiku (barato e ótimo)
-              </option>
               <option value="openai/gpt-4o-mini">GPT-4o mini (barato)</option>
-              <option value="google/gemini-flash-1.5">Gemini Flash 1.5 (rápido)</option>
+              <option value="google/gemini-2.5-flash">Gemini 2.5 Flash (rápido)</option>
               <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
             </optgroup>
             <optgroup label="🆓 Grátis (tier gratuito OpenRouter)">
@@ -130,10 +130,6 @@ export default function IAPanel({
                 Llama 3.3 70B (grátis)
               </option>
               <option value="qwen/qwen-2.5-72b-instruct:free">Qwen 2.5 72B (grátis)</option>
-              <option value="mistralai/mistral-nemo:free">
-                Mistral Nemo (grátis · leve)
-              </option>
-              <option value="google/gemma-2-9b-it:free">Gemma 2 9B (grátis · leve)</option>
             </optgroup>
           </select>
 

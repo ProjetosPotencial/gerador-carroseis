@@ -21,6 +21,7 @@ export type FeedTemplateId =
   | "stories_pilula_headline"
   | "feed_icone_cta"
   | "stories_icone_cta"
+  | "stories_chamada"
   // Em construção (placeholders)
   | "feed_amarelo_ilustracao"
   | "stories_amarelo_ilustracao"
@@ -64,6 +65,12 @@ export interface FeedSlideData {
   fotoUrl?: string;
   /** Posição/zoom da foto (object-position CSS, ex: "center", "top right"). */
   fotoPosicao?: string;
+
+  // ============ GERAÇÃO DE IMAGEM COM IA (v7.8) ============
+  imgPrompt?: string;
+  imgStatus?: "idle" | "gerando" | "ok" | "erro";
+  imgErro?: string;
+  fotoOrigem?: "ia" | "manual";
 
   // ============ COR DO BLOB / DESTAQUE ============
   /** Cor do blob amarelo / footer / botão accent. Default depende do template. */

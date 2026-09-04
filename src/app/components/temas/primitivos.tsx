@@ -15,18 +15,22 @@ export function Topbar({
   estilo = "padrao",
   corNumero,
   mostrar = true,
+  tamanho,
 }: {
   cor: string;
   marca: string;
   numero: string;
   estilo?: "padrao" | "refined";
+  /** v7.25: tamanho do texto do topbar (px). Se omitido, usa o padrão do estilo. */
+  tamanhoTexto?: number;
   /** v7.5: cor independente da numeração (se omitida, usa `cor`) */
   corNumero?: string;
   /** v7.6: se false, não renderiza nada. Default true. */
   mostrar?: boolean;
+  tamanho?: number;
 }) {
   if (!mostrar) return null;
-  const tamanho = estilo === "refined" ? 12 : 14;
+  const tamTexto = (tamanho as number | undefined) ?? (estilo === "refined" ? 12 : 14);
   const tracking = estilo === "refined" ? "1.5px" : "2px";
   return (
     <div
@@ -38,7 +42,7 @@ export function Topbar({
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        fontSize: tamanho,
+        fontSize: tamTexto,
         fontWeight: 700,
         letterSpacing: tracking,
         textTransform: "uppercase",
@@ -429,6 +433,7 @@ export function FotoOuPlaceholder({
   offsetX,
   offsetY,
   onPositionChange,
+  onZoomChange,
 }: {
   url: string;
   largura: number;
@@ -445,19 +450,47 @@ export function FotoOuPlaceholder({
   offsetY?: number;
   /** v7.7.23: callback de drag. Quando undefined, drag desativado (modo export). */
   onPositionChange?: (offsetX: number, offsetY: number) => void;
+  /** v7.22: zoom por scroll do mouse. */
+  onZoomChange?: (zoom: number) => void;
 }) {
-  const z = zoom ?? 1;
-  const ox = offsetX ?? 0;
-  const oy = offsetY ?? 0;
+  const clampN = (v: number, mn: number, mx: number) => Math.max(mn, Math.min(mx, v));
+  const z = Math.max(1, Math.min(3, zoom ?? 1));
 
-  // Estado de drag (só efetivo quando há onPositionChange)
   const [arrastando, setArrastando] = useState(false);
+  // v7.24: tamanho natural da imagem (default 4:5 vertical — padrao gerado).
+  const [nat, setNat] = useState<{ w: number; h: number }>({ w: 1080, h: 1350 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef({
-    iniciouEm: { x: 0, y: 0 },
-    offsetInicial: { x: ox, y: oy },
-  });
-  const podeArrastar = Boolean(onPositionChange) && z > 1;
+
+  // A imagem e renderizada no tamanho REAL de cobertura (>= container em ambos os
+  // eixos) e o excedente vira "folga" arrastavel. Assim da pra arrastar por toda a
+  // area visivel — inclusive SEM zoom, quando a foto e mais alta/larga que a janela.
+  const coverScale = Math.max(largura / nat.w, altura / nat.h);
+  const dispW = nat.w * coverScale * z;
+  const dispH = nat.h * coverScale * z;
+  const overflowX = Math.max(0, dispW - largura);
+  const overflowY = Math.max(0, dispH - altura);
+  const maxOffX = overflowX > 0 ? 50 : 0; // offset normalizado -50..50 (50 = borda)
+  const maxOffY = overflowY > 0 ? 50 : 0;
+  const ox = clampN(offsetX ?? 0, -maxOffX, maxOffX);
+  const oy = clampN(offsetY ?? 0, -maxOffY, maxOffY);
+  const panX = (ox / 50) * (overflowX / 2);
+  const panY = (oy / 50) * (overflowY / 2);
+  const podeArrastar = Boolean(onPositionChange) && (overflowX > 1 || overflowY > 1);
+
+  const dragRef = useRef({ iniciouEm: { x: 0, y: 0 }, offsetInicial: { x: ox, y: oy } });
+
+  // Zoom por scroll do mouse
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !onZoomChange) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const fator = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      onZoomChange(Number(clampN(z * fator, 1, 3).toFixed(3)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [z, onZoomChange]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!podeArrastar) return;
@@ -475,10 +508,15 @@ export function FotoOuPlaceholder({
     const handleMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
       const rect = containerRef.current.getBoundingClientRect();
-      const dxPct = ((e.clientX - dragRef.current.iniciouEm.x) / rect.width) * 100;
-      const dyPct = ((e.clientY - dragRef.current.iniciouEm.y) / rect.height) * 100;
-      const novoX = Math.max(-50, Math.min(50, dragRef.current.offsetInicial.x + dxPct * z));
-      const novoY = Math.max(-50, Math.min(50, dragRef.current.offsetInicial.y + dyPct * z));
+      // px de tela -> px do slide (mesma escala) -> offset normalizado pela folga real.
+      const escX = rect.width / largura || 1;
+      const escY = rect.height / altura || 1;
+      const dPanX = overflowX > 0 ? (e.clientX - dragRef.current.iniciouEm.x) / escX : 0;
+      const dPanY = overflowY > 0 ? (e.clientY - dragRef.current.iniciouEm.y) / escY : 0;
+      const dOx = overflowX > 0 ? (dPanX / (overflowX / 2)) * 50 : 0;
+      const dOy = overflowY > 0 ? (dPanY / (overflowY / 2)) * 50 : 0;
+      const novoX = clampN(dragRef.current.offsetInicial.x + dOx, -maxOffX, maxOffX);
+      const novoY = clampN(dragRef.current.offsetInicial.y + dOy, -maxOffY, maxOffY);
       onPositionChange(novoX, novoY);
     };
     const handleUp = () => setArrastando(false);
@@ -488,15 +526,7 @@ export function FotoOuPlaceholder({
       window.removeEventListener("mousemove", handleMove);
       window.removeEventListener("mouseup", handleUp);
     };
-  }, [arrastando, onPositionChange, z]);
-
-  // Transform combinado pra zoom + drag (mesma lógica do FotoDraggable do Feed)
-  const transformParts: string[] = [];
-  if (z !== 1) transformParts.push(`scale(${z})`);
-  if (ox !== 0 || oy !== 0) {
-    transformParts.push(`translate(${ox / z}%, ${oy / z}%)`);
-  }
-  const fotoTransform = transformParts.length > 0 ? transformParts.join(" ") : undefined;
+  }, [arrastando, onPositionChange, overflowX, overflowY, maxOffX, maxOffY, largura, altura]);
 
   if (url) {
     return (
@@ -507,11 +537,12 @@ export function FotoOuPlaceholder({
           height: altura,
           borderRadius,
           overflow: "hidden",
+          position: "relative",
           cursor: podeArrastar ? (arrastando ? "grabbing" : "grab") : "default",
           userSelect: "none",
-          // v7.7.24: quando draggável, fica por cima dos overlays do template
-          // pra eventos de mouse não serem bloqueados por gradientes/topbars
-          zIndex: podeArrastar ? 100 : undefined,
+          touchAction: onZoomChange ? "none" : undefined,
+          // v7.22.1: sobe pra frente SO enquanto arrasta (pra nao tampar o texto).
+          zIndex: arrastando ? 100 : undefined,
           ...style,
         }}
         onMouseDown={handleMouseDown}
@@ -521,12 +552,18 @@ export function FotoOuPlaceholder({
           alt=""
           crossOrigin="anonymous"
           draggable={false}
+          onLoad={(e) => {
+            const im = e.currentTarget;
+            if (im.naturalWidth && im.naturalHeight) setNat({ w: im.naturalWidth, h: im.naturalHeight });
+          }}
           style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: "center",
-            transform: fotoTransform,
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            width: dispW,
+            height: dispH,
+            maxWidth: "none",
+            transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px)`,
             transformOrigin: "center center",
             pointerEvents: "none",
           }}

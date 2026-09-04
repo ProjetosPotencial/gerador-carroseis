@@ -39,13 +39,16 @@ MARCA QUE ASSINA: ${marca}
 
 ---
 
-ESTRUTURA DO ARCO (adapte à quantidade de slides):
-• Slide 1 — CAPA provocativa: tese central que desafia o status quo
-• Slide 2 — CONTEXTO histórico: como chegamos até aqui
-• Slide 3 — DADO/VIRADA: número ou fato que sustenta a tese
-• Slides intermediários — desenvolvimento (mitos, perfis, implicações) ALTERNANDO layouts para dar ritmo
-• Penúltimo — CONCLUSÃO: síntese poderosa
-• Último — CTA: mostrarPill: true, textoPill com call to action
+ESTRUTURA FIXA — sempre 7 slides, EXATAMENTE nesta ordem, com este layout e cor de fundo:
+• Slide 1 — CAPA (layout "foto_cheia", corFundo "preto"): tese central provocativa. kicker + headline forte + destaque.
+• Slide 2 — CONTEXTO (layout "split_horizontal", corFundo "preto"): como chegamos até aqui. kicker + headline + corpo + destaque.
+• Slide 3 — DADO/VIRADA (layout "split_horizontal", corFundo "amarelo"): número ou fato que sustenta a tese. kicker + headline + corpo + destaque.
+• Slide 4 — DESENVOLVIMENTO (layout "tipografia_pura", corFundo "amarelo"): aprofunda o argumento. kicker + headline gigante + corpo + destaque.
+• Slide 5 — PERFIL/IMPLICAÇÃO (layout "split_horizontal", corFundo "preto"): quem ou o que muda. kicker + headline + corpo + destaque.
+• Slide 6 — APROFUNDAMENTO (layout "foto_cheia", corFundo "preto"): reforço visual do argumento. kicker + headline + destaque.
+• Slide 7 — CTA FINAL (layout "foto_cheia_final", corFundo "preto"): fechamento com chamada. kicker + headline + corpo + destaque + textoPill (ex: "@marca · SIGA").
+
+NÃO invente outros layouts nem mude a ordem. Use exatamente os 7 acima. Preencha TODOS os campos de texto de cada slide — não deixe conteúdo de fora.
 
 REGRAS DE COPY:
 • Kicker: 1-5 palavras em CAIXA ALTA, sem ponto final. Ex: "TESE Nº 1", "MITO", "CONCLUSÃO"
@@ -59,8 +62,7 @@ REGRAS DE COPY:
 LAYOUTS DISPONÍVEIS NO TEMA "${temaVisual.nome}" (use o ID exato):
 ${layoutsLista}
 
-COR DE FUNDO de cada slide (use ${coresFundoPossiveis}):
-Alterne para criar ritmo. Em "${temaVisual.nome}", priorize contraste entre slides consecutivos.
+COR DE FUNDO: já fixada na estrutura acima (slides 1, 2, 5, 6 e 7 = "preto"; slides 3 e 4 = "amarelo"). Mantenha assim.
 
 ---
 
@@ -103,6 +105,7 @@ interface SlideIABruto {
 const LAYOUTS_VALIDOS: LayoutId[] = [
   // Tema Classic
   "foto_cheia",
+  "foto_cheia_final",
   "split_horizontal",
   "split_invertido",
   "tipografia_pura",

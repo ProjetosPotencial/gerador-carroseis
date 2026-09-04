@@ -1,4 +1,4 @@
-import { FileText, Sparkles, Download, Loader2 } from "lucide-react";
+import { FileText, Sparkles, Download, Loader2, Wand2, ImagePlus, Palette, Trash2, Library, UploadCloud, CalendarCheck } from "lucide-react";
 import type { Status } from "./useStatus";
 
 interface ToolbarProps {
@@ -12,6 +12,20 @@ interface ToolbarProps {
   onTogglePainelIA: () => void;
   onExportarSlideAtual: () => void;
   onExportarTudo: () => void;
+  onSalvarSlides: () => void;
+  salvando: boolean;
+  mostrarPainelEstilo: boolean;
+  onTogglePainelEstilo: () => void;
+  mostrarPainelBanco: boolean;
+  onTogglePainelBanco: () => void;
+  mostrarPainelAgenda: boolean;
+  onTogglePainelAgenda: () => void;
+  onGerarImagens: () => void;
+  gerandoImagens: boolean;
+  progressoImagens: { atual: number; total: number } | null;
+  slidesPendentes: number;
+  onInverterCores: () => void;
+  onLimparTudo: () => void;
 }
 
 /**
@@ -28,6 +42,20 @@ export default function Toolbar({
   onTogglePainelIA,
   onExportarSlideAtual,
   onExportarTudo,
+  onSalvarSlides,
+  salvando,
+  mostrarPainelEstilo,
+  onTogglePainelEstilo,
+  mostrarPainelBanco,
+  onTogglePainelBanco,
+  mostrarPainelAgenda,
+  onTogglePainelAgenda,
+  onGerarImagens,
+  gerandoImagens,
+  progressoImagens,
+  slidesPendentes,
+  onInverterCores,
+  onLimparTudo,
 }: ToolbarProps) {
   const exportando = status.tipo === "exportando";
 
@@ -73,6 +101,80 @@ export default function Toolbar({
           Formatar com IA
         </button>
         <button
+          onClick={onTogglePainelEstilo}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+            mostrarPainelEstilo
+              ? "bg-[#FFC528] text-black"
+              : "bg-[#1a1a1a] border border-gray-800 text-gray-300 hover:border-[#FFC528] hover:text-white"
+          }`}
+          title="Estética global aplicada a todas as imagens geradas"
+        >
+          <Wand2 size={16} />
+          Estilo visual
+        </button>
+        <button
+          onClick={onTogglePainelBanco}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+            mostrarPainelBanco
+              ? "bg-[#FFC528] text-black"
+              : "bg-[#1a1a1a] border border-gray-800 text-gray-300 hover:border-[#FFC528] hover:text-white"
+          }`}
+          title="Metadados do repositório de imagens (Supabase)"
+        >
+          <Library size={16} />
+          Banco de imagens
+        </button>
+        <button
+          onClick={onTogglePainelAgenda}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all ${
+            mostrarPainelAgenda
+              ? "bg-[#FFC528] text-black"
+              : "bg-[#1a1a1a] border border-gray-800 text-gray-300 hover:border-[#FFC528] hover:text-white"
+          }`}
+          title="Importar legendas e gerar o CSV de agendamento da semana"
+        >
+          <CalendarCheck size={16} />
+          Agendamento
+        </button>
+        <button
+          onClick={onInverterCores}
+          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-[#1a1a1a] border border-gray-800 text-gray-300 hover:border-[#FFC528] hover:text-white transition-all"
+          title="Inverte a cor de fundo (preto ⇄ amarelo) de todos os slides"
+        >
+          <Palette size={16} />
+          Inverter cores
+        </button>
+        <button
+          onClick={onGerarImagens}
+          disabled={gerandoImagens || slidesPendentes === 0}
+          className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold bg-[#1a1a1a] border border-[#FFC528]/40 text-[#FFC528] hover:bg-[#FFC528]/10 transition-all disabled:opacity-40 disabled:hover:bg-[#1a1a1a]"
+          title={slidesPendentes === 0 ? "Nenhum slide com IMGPROMPT pendente." : "Gera a imagem de todos os slides com IMGPROMPT sem foto"}
+        >
+          {gerandoImagens ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              {progressoImagens ? `Gerando ${progressoImagens.atual} de ${progressoImagens.total}` : "Gerando…"}
+            </>
+          ) : (
+            <>
+              <ImagePlus size={16} />
+              Gerar imagens (IA)
+              {slidesPendentes > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#FFC528] text-black text-[10px] font-bold">{slidesPendentes}</span>
+              )}
+            </>
+          )}
+        </button>
+        <button
+          onClick={onSalvarSlides}
+          disabled={salvando}
+          className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold bg-[#1a1a1a] border border-[#FFC528]/40 text-[#FFC528] hover:bg-[#FFC528]/10 transition-all disabled:opacity-40"
+          title="Renderiza os slides e salva no repositório (bucket slides-finais)"
+        >
+          {salvando ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
+          {salvando ? "Salvando…" : "Salvar slides"}
+        </button>
+        <button
           onClick={onExportarSlideAtual}
           disabled={exportando}
           className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-[#1a1a1a] border border-gray-800 text-gray-300 hover:border-[#FFC528] hover:text-white transition-all disabled:opacity-40"
@@ -91,6 +193,14 @@ export default function Toolbar({
             <Download size={16} />
           )}
           Baixar ZIP ({numSlides} slides)
+        </button>
+        <button
+          onClick={onLimparTudo}
+          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-[#1a1a1a] border border-gray-800 text-gray-400 hover:border-red-500 hover:text-red-400 transition-all"
+          title="Apaga os slides atuais e recarrega a estrutura padrão de 7 slides"
+        >
+          <Trash2 size={16} />
+          Limpar tudo
         </button>
       </div>
     </div>

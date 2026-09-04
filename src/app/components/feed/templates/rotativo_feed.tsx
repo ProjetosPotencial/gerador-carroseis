@@ -61,7 +61,7 @@ export default function TemplateRotativoFeed({
   const italicCTA = slide.italicCTA ?? false;
 
   // ===== Textura (v7.7.4: 2 camadas) =====
-  const mostrarTextura = slide.mostrarTextura !== false;
+  const mostrarTextura = slide.mostrarTextura === true;
   const opacidadeFoto = slide.opacidadeTextura ?? 0.75;
   const modoFoto = slide.modoTextura ?? "overlay";
   // No rodapé: defaults soft-light 40% pra ficar sutil e vibrante (sem mancha escura)
@@ -103,6 +103,7 @@ export default function TemplateRotativoFeed({
               ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y })
               : undefined
           }
+          onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
         />
         ) : (
           <div

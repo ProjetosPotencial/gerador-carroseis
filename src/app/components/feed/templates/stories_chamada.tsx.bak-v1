@@ -1,0 +1,153 @@
+import type { FeedSlideData } from "./tipos";
+import { FONTE_KUFAM, obterAlturaRodape, type TipoRodape } from "./tipos";
+import RodapePNG from "../components/RodapePNG";
+import FotoDraggable from "../components/FotoDraggable";
+
+/**
+ * stories_chamada — Story 1080x1920 gerado a partir da FOTO da capa do carrossel.
+ *
+ * Regra permanente "Story-chamada por carrossel" (v7.24):
+ *  - Fundo = a FOTO da capa do carrossel (cover, reenquadravel com zoom/arraste).
+ *  - Scrim escuro no topo e no rodape para contraste (WCAG).
+ *  - Textos EMBUTIDOS na arte: "Novo no feed" (topo) + "Arrasta pro post ->" (centro/baixo).
+ *  - Marca + URL no rodape (RodapePNG ja traz parceleaqui.com.br).
+ *  - Sem nova geracao de IA: reaproveita a foto da capa (composicao/canvas).
+ *
+ * Story auto-publicado no Instagram nao aceita link clicavel nem sticker, por isso
+ * a chamada e o link vao desenhados na propria arte.
+ */
+export default function TemplateStoriesChamada({
+  slide,
+  escala = 1,
+  onSlideChange,
+}: {
+  slide: FeedSlideData;
+  escala?: number;
+  onSlideChange?: (patch: Partial<FeedSlideData>) => void;
+}) {
+  const e = (n: number) => `${n * escala}px`;
+  const any = slide as any;
+
+  const tipoRodape: TipoRodape = slide.tipoRodape ?? "rodape_01";
+  const alturaRodape = obterAlturaRodape(tipoRodape, "stories");
+
+  const textoTopo: string = any.chamadaTopo ?? "Novo no feed";
+  const textoMeio: string = any.chamadaMeio ?? "Arrasta pro post";
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: e(1080),
+        height: e(1920),
+        backgroundColor: "#000",
+        fontFamily: FONTE_KUFAM,
+        overflow: "hidden",
+      }}
+    >
+      {/* FOTO DA CAPA — fundo cheio (atras do rodape) */}
+      <div style={{ position: "absolute", left: 0, top: 0, width: e(1080), height: e(1920), overflow: "hidden" }}>
+        {slide.fotoUrl ? (
+          <FotoDraggable
+            src={slide.fotoUrl}
+            width={1080 * escala}
+            height={1920 * escala}
+            zoom={slide.fotoZoom ?? 1}
+            offsetX={slide.fotoOffsetX ?? 0}
+            offsetY={slide.fotoOffsetY ?? 0}
+            onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+            onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              background: "linear-gradient(135deg, #2a2a2a, #0a0a0a)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#666",
+              fontSize: e(20),
+            }}
+          >
+            [ FOTO DA CAPA ]
+          </div>
+        )}
+      </div>
+
+      {/* Scrim topo */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          height: e(560),
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0) 100%)",
+          pointerEvents: "none",
+        }}
+      />
+      {/* Scrim rodape */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: e(900),
+          background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 35%, rgba(0,0,0,0) 100%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* "Novo no feed" — topo */}
+      <div
+        style={{
+          position: "absolute",
+          top: e(150),
+          left: e(72),
+          color: "#FFFFFF",
+          fontSize: e(34),
+          fontWeight: 700,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          opacity: 0.95,
+        }}
+      >
+        {textoTopo}
+      </div>
+
+      {/* "Arrasta pro post ->" — centro/baixo, acima do rodape */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: e(alturaRodape + 96),
+          left: e(72),
+          right: e(72),
+          color: "#FFFFFF",
+          display: "flex",
+          alignItems: "center",
+          gap: e(20),
+        }}
+      >
+        <span
+          style={{
+            fontSize: e(64),
+            fontWeight: 800,
+            lineHeight: 1.02,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {textoMeio}
+        </span>
+        <span style={{ fontSize: e(64), fontWeight: 800, lineHeight: 1 }}>&#8594;</span>
+      </div>
+
+      {/* Rodape (marca + parceleaqui.com.br) */}
+      {slide.mostrarFooter !== false && (
+        <RodapePNG tipo={tipoRodape} formato="stories" escala={escala} />
+      )}
+    </div>
+  );
+}

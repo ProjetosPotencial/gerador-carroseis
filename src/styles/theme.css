@@ -1,38 +1,48 @@
 @custom-variant dark (&:is(.dark *));
 
-/* ===== V6 Design Tokens ===== */
+/* ===== V6 Design Tokens · alinhados ao DS Parcele Aqui v1.1 =====
+   Base na escala "Cinza fria · Estrutura" do DS (grafite premium, sem preto
+   puro). Accent = amarelo Potencial #FFC528 (cor da marca no conteúdo).
+   Fontes inalteradas. */
 :root {
-  /* Dark mode (default) — Black Aesthetic v7.4 */
-  --v6-bg-base: #050505;
-  --v6-bg-raised: #050505;
-  --v6-bg-elevated: #0A0A0A;
-  --v6-bg-sunken: #0A0A0A;
+  /* Dark — grafite (cinza fria do DS), não preto puro */
+  --v6-bg-base: #16181C;        /* gray-900 · fundo de página */
+  --v6-bg-raised: #1D2025;      /* painel / card */
+  --v6-bg-elevated: #24282F;    /* painel aninhado / elevado */
+  --v6-bg-sunken: #191B20;      /* inputs (levemente rebaixado do painel) */
+  --v6-bg-hover: #2A2E35;       /* gray-800+ · hover de superfície */
   --v6-border: rgba(255, 255, 255, 0.08);
-  --v6-border-muted: rgba(255, 255, 255, 0.04);
-  --v6-text-primary: #FFFFFF;
-  --v6-text-secondary: #A1A1A1;
-  --v6-text-muted: #6B6B6B;
+  --v6-border-muted: rgba(255, 255, 255, 0.05);
+  --v6-border-strong: rgba(255, 255, 255, 0.15);
+  --v6-text-primary: #F5F6F8;
+  --v6-text-secondary: #AEB2BC; /* gray-400 */
+  --v6-text-muted: #868B96;     /* gray-500 */
   --v6-accent: #FFC528;
   --v6-accent-hover: #FFD960;
-  --v6-accent-glow: rgba(255, 197, 40, 0.0); /* glow desativado */
+  --v6-accent-glow: rgba(255, 197, 40, 0.0);
+  --v6-danger-subtle: #241A1C;
 }
 
 [data-theme="light"] {
-  --v6-bg-base: #FAFAF8;
+  /* Light — mesma família cinza fria do DS */
+  --v6-bg-base: #F7F8FA;        /* gray-50 */
   --v6-bg-raised: #FFFFFF;
   --v6-bg-elevated: #FFFFFF;
-  --v6-bg-sunken: #F5F3EE;
-  --v6-border: #E5E5E5;
-  --v6-border-muted: #F0EFEB;
-  --v6-text-primary: #1A1A1A;
-  --v6-text-secondary: #6B6B6B;
-  --v6-text-muted: #A1A1A1;
+  --v6-bg-sunken: #F0F1F4;      /* gray-100 */
+  --v6-bg-hover: #E3E5EA;       /* gray-200 */
+  --v6-border: #E3E5EA;         /* gray-200 */
+  --v6-border-muted: #F0F1F4;   /* gray-100 */
+  --v6-border-strong: #AEB2BC;  /* gray-400 */
+  --v6-text-primary: #16181C;   /* gray-900 */
+  --v6-text-secondary: #5F636D; /* gray-600 */
+  --v6-text-muted: #868B96;     /* gray-500 */
   --v6-accent: #FFC528;
   --v6-accent-hover: #E5AC14;
-  --v6-accent-glow: rgba(255, 197, 40, 0.25);
+  --v6-accent-glow: rgba(255, 197, 40, 0.22);
+  --v6-danger-subtle: #FEF2F2;
 }
 
-/* Aplica tema aos editores via classes */
+/* Classes utilitárias de tema (uso direto) */
 .v6-bg-base { background-color: var(--v6-bg-base) !important; }
 .v6-bg-raised { background-color: var(--v6-bg-raised) !important; }
 .v6-bg-elevated { background-color: var(--v6-bg-elevated) !important; }
@@ -42,19 +52,52 @@
 .v6-text-muted { color: var(--v6-text-muted) !important; }
 .v6-border { border-color: var(--v6-border) !important; }
 
-/* Override global pros editores com classes hard-coded — mapeia cores antigas pras variáveis */
+/* ==========================================================
+   Override do "chrome" dos editores: classes hard-coded → tokens de tema.
+   Escopo em `main` (todos os editores). NÃO afeta o render dos slides
+   (que usa estilo inline; html2canvas captura os hex reais).
+   ========================================================== */
+
+/* --- Superfícies --- */
+main .bg-\[\#0a0a0a\],
 main .bg-\[\#0f0f0f\] { background-color: var(--v6-bg-base) !important; }
-main .bg-\[\#141414\] { background-color: var(--v6-bg-elevated) !important; }
-main .bg-\[\#1a1a1a\] { background-color: var(--v6-bg-sunken) !important; }
+main .bg-\[\#141414\] { background-color: var(--v6-bg-raised) !important; }
+main .bg-\[\#1a1a1a\],
 main .bg-\[\#1f1f1f\] { background-color: var(--v6-bg-sunken) !important; }
-main .bg-\[\#0a0a0a\] { background-color: var(--v6-bg-raised) !important; }
-main .border-gray-800 { border-color: var(--v6-border) !important; }
-main .border-gray-700 { border-color: var(--v6-border) !important; }
-main .text-white { color: var(--v6-text-primary) !important; }
+main .bg-\[\#2a2a2a\] { background-color: var(--v6-bg-hover) !important; }
+main .bg-gray-800 { background-color: var(--v6-bg-sunken) !important; }
+main .bg-\[\#1a0f0f\] { background-color: var(--v6-danger-subtle) !important; }
+
+/* --- Texto --- */
+main .text-white,
+main .text-gray-200,
 main .text-gray-300 { color: var(--v6-text-primary) !important; }
 main .text-gray-400 { color: var(--v6-text-secondary) !important; }
-main .text-gray-500 { color: var(--v6-text-muted) !important; }
-main .text-gray-600 { color: var(--v6-text-muted) !important; }
+main .text-gray-500,
+main .text-gray-600,
+main .text-gray-700 { color: var(--v6-text-muted) !important; }
+
+/* --- Bordas --- */
+main .border-gray-700,
+main .border-gray-800,
+main .border-gray-900 { border-color: var(--v6-border) !important; }
+main .border-gray-600 { border-color: var(--v6-border-strong) !important; }
+
+/* --- Estados hover/focus (senão o modo claro fica ilegível) --- */
+main .hover\:text-white:hover,
+main .hover\:text-gray-200:hover,
+main .hover\:text-gray-300:hover { color: var(--v6-text-primary) !important; }
+main .hover\:bg-\[\#0f0f0f\]:hover,
+main .hover\:bg-\[\#141414\]:hover,
+main .hover\:bg-\[\#1a1a1a\]:hover,
+main .hover\:bg-\[\#2a2a2a\]:hover,
+main .hover\:bg-black:hover { background-color: var(--v6-bg-hover) !important; }
+main .hover\:border-gray-600:hover,
+main .hover\:border-gray-700:hover { border-color: var(--v6-border-strong) !important; }
+
+/* --- Placeholder --- */
+main input::placeholder,
+main textarea::placeholder { color: var(--v6-text-muted) !important; opacity: 1; }
 
 /* Force hex colors for html2canvas compatibility */
 * {

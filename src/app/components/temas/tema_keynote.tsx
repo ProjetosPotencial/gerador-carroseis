@@ -168,6 +168,7 @@ function LayoutFotoRetrato({ slide, tema, marca, numero, coresResolvidas, onSlid
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
       {/* Overlay embaixo pra legibilidade */}
       <div
@@ -322,6 +323,7 @@ function LayoutDuplaFotoKeynote({ slide, tema, marca, numero, coresResolvidas, o
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
       </div>
 
@@ -425,6 +427,7 @@ function LayoutSilhuetaClaro({ slide, tema, marca, numero, coresResolvidas, onSl
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
       </div>
 
@@ -480,6 +483,7 @@ function LayoutFotoLateral({ slide, tema, marca, numero, coresResolvidas, onSlid
         offsetX={slide.fotoOffsetX}
         offsetY={slide.fotoOffsetY}
         onPositionChange={onSlideChange ? (x, y) => onSlideChange({ fotoOffsetX: x, fotoOffsetY: y }) : undefined}
+        onZoomChange={onSlideChange ? (zz) => onSlideChange({ fotoZoom: zz }) : undefined}
       />
       </div>
 
