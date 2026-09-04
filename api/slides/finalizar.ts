@@ -27,6 +27,11 @@ async function verificarAcesso(
   if (!base || !key) return { ok: true };
   const auth = req.headers.get("authorization") || "";
   const token = /^bearer\s+/i.test(auth) ? auth.replace(/^bearer\s+/i, "").trim() : "";
+  // v7.29: chave de acesso compartilhada. Com o app sem tela de login, é ela
+  // que autoriza as chamadas do navegador e das automações. Definida em
+  // CHAVE_ACESSO (ou CRON_SECRET, mantido por compatibilidade).
+  const chaveAcesso = (process.env.CHAVE_ACESSO || process.env.CRON_SECRET || "").trim();
+  if (chaveAcesso && token === chaveAcesso) return { ok: true };
   if (!token) return { ok: false, status: 401, erro: "Não autenticado." };
   try {
     const r = await fetch(base.replace(/\/+$/, "") + "/auth/v1/user", {

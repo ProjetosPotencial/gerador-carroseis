@@ -48,6 +48,47 @@ const MODELO_DEFAULT = "anthropic/claude-sonnet-4.5";
 // Status que justificam tentar outro modelo (sem dar erro pro usuário).
 const STATUS_RETRY = [408, 429, 500, 502, 503, 504];
 
+
+/**
+ * v7.29 — controle de acesso da rota que gasta crédito de modelo.
+ * Até aqui /api/ia era a única rota sem verificação nenhuma: qualquer pessoa
+ * com a URL podia queimar a OPENROUTER_API_KEY. Agora aceita a chave de acesso
+ * compartilhada (app sem tela de login e automações) ou uma sessão do Supabase
+ * cujo e-mail esteja na allowlist. Sem EMAILS_AUTORIZADOS nem CHAVE_ACESSO
+ * configurados, o comportamento continua liberado, como nas outras rotas.
+ */
+async function verificarAcessoIA(
+  req: Request
+): Promise<{ ok: boolean; erro?: string; status?: number }> {
+  const allow = (process.env.EMAILS_AUTORIZADOS || "").trim();
+  const chaveAcesso = (process.env.CHAVE_ACESSO || process.env.CRON_SECRET || "").trim();
+  if (!allow && !chaveAcesso) return { ok: true };
+
+  const auth = req.headers.get("authorization") || "";
+  const token = /^bearer\s+/i.test(auth) ? auth.replace(/^bearer\s+/i, "").trim() : "";
+  if (chaveAcesso && token === chaveAcesso) return { ok: true };
+  if (!allow) return { ok: false, status: 401, erro: "Não autenticado." };
+
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!base || !key) return { ok: true };
+  if (!token) return { ok: false, status: 401, erro: "Não autenticado." };
+
+  try {
+    const r = await fetch(base.replace(/\/+$/, "") + "/auth/v1/user", {
+      headers: { Authorization: "Bearer " + token, apikey: key },
+    });
+    if (!r.ok) return { ok: false, status: 401, erro: "Sessão inválida ou expirada." };
+    const u = await r.json();
+    const email = String(u?.email || "").toLowerCase();
+    const lista = allow.toLowerCase().split(/[\s,;]+/).filter(Boolean);
+    if (email && lista.includes(email)) return { ok: true };
+    return { ok: false, status: 403, erro: "E-mail não autorizado." };
+  } catch {
+    return { ok: false, status: 401, erro: "Falha ao validar a sessão." };
+  }
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -55,13 +96,18 @@ export default async function handler(req: Request): Promise<Response> {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
       },
     });
   }
 
   if (req.method !== "POST") {
     return json({ error: "Use POST" }, 405);
+  }
+
+  const acesso = await verificarAcessoIA(req);
+  if (!acesso.ok) {
+    return json({ error: acesso.erro || "Sem acesso." }, acesso.status || 401);
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY;

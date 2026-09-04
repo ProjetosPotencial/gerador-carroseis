@@ -92,7 +92,7 @@ async function verificarAcessoLocal(
   const auth = req.headers.get("authorization") || "";
   const token = /^bearer\s+/i.test(auth) ? auth.replace(/^bearer\s+/i, "").trim() : "";
   // v7.20.6: automação (produzir-semana / render headless) autentica com CRON_SECRET
-  const cron = (process.env.CRON_SECRET || "").trim();
+  const cron = (process.env.CHAVE_ACESSO || process.env.CRON_SECRET || "").trim();
   if (cron && token === cron) return { ok: true };
   if (!token) return { ok: false, status: 401, erro: "Não autenticado." };
   try {

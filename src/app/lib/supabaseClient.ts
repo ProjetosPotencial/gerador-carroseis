@@ -13,7 +13,15 @@ export const authConfigurado = Boolean(url && anon);
 
 export const supabase: SupabaseClient | null = authConfigurado
   ? createClient(url as string, anon as string, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        // v7.28: chave fixa de storage. Sem isso a chave deriva da URL do
+        // projeto e qualquer troca de ambiente derruba a sessão salva.
+        storageKey: "gp-gerador-auth",
+        storage: typeof window !== "undefined" ? window.localStorage : undefined,
+      },
     })
   : null;
 
@@ -27,8 +35,23 @@ export async function getAccessToken(): Promise<string | null> {
   }
 }
 
-/** Cabeçalho Authorization pras chamadas /api/* (vazio se não houver sessão). */
+/**
+ * v7.29 — chave de acesso compartilhada.
+ * Com o app sem tela de login, é ela que autoriza as chamadas /api/*.
+ * Defina VITE_CHAVE_ACESSO no build e CHAVE_ACESSO no servidor, com o mesmo
+ * valor. Se não definir nenhuma das duas, as rotas seguem o comportamento
+ * antigo (liberadas quando EMAILS_AUTORIZADOS está vazio).
+ */
+export const chaveAcesso: string = String(env.VITE_CHAVE_ACESSO || "").trim();
+
+/**
+ * Cabeçalho Authorization pras chamadas /api/*.
+ * Prioridade: sessão do Supabase (quando existir) > chave compartilhada.
+ * Vazio quando não há nem uma nem outra.
+ */
 export async function authHeaders(): Promise<Record<string, string>> {
   const t = await getAccessToken();
-  return t ? { Authorization: "Bearer " + t } : {};
+  if (t) return { Authorization: "Bearer " + t };
+  if (chaveAcesso) return { Authorization: "Bearer " + chaveAcesso };
+  return {};
 }
