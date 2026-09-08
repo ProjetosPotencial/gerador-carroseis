@@ -1827,12 +1827,13 @@ function Campo({
           style={{ ...selectStyle, resize: "vertical" }}
         />
       ) : (
-        <input
-          type="text"
+        <textarea
           value={valor}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.preventDefault(); }}
           maxLength={maxLen}
-          style={selectStyle}
+          rows={1}
+          style={{ ...selectStyle, resize: "none" }}
         />
       )}
     </div>

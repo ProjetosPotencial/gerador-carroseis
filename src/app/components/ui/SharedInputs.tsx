@@ -97,6 +97,31 @@ export function TextInput({
   type?: string;
   className?: string;
 }) {
+  const cls = `w-full px-3 py-2.5 rounded-lg text-sm
+        bg-[var(--v6-bg-sunken)] border border-[var(--v6-border)]
+        text-[var(--v6-text-primary)] placeholder:text-[var(--v6-text-muted)]
+        focus:outline-none focus:border-[#FFC528] focus:ring-2 focus:ring-[#FFC528]/20
+        disabled:opacity-40 disabled:cursor-not-allowed
+        transition-[border-color,box-shadow] duration-150
+        ${className}`;
+  // Campos de texto viram textarea de 1 linha p/ aceitar Shift+Enter (quebra de
+  // linha). Enter puro não quebra; só Shift+Enter. Number/color/etc seguem input.
+  if (type === "text") {
+    return (
+      <textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.preventDefault(); }}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        disabled={disabled}
+        rows={1}
+        spellCheck={false}
+        className={cls + " resize-none"}
+      />
+    );
+  }
   return (
     <input
       id={id}
@@ -106,13 +131,7 @@ export function TextInput({
       placeholder={placeholder}
       maxLength={maxLength}
       disabled={disabled}
-      className={`w-full px-3 py-2.5 rounded-lg text-sm
-        bg-[var(--v6-bg-sunken)] border border-[var(--v6-border)]
-        text-[var(--v6-text-primary)] placeholder:text-[var(--v6-text-muted)]
-        focus:outline-none focus:border-[#FFC528] focus:ring-2 focus:ring-[#FFC528]/20
-        disabled:opacity-40 disabled:cursor-not-allowed
-        transition-[border-color,box-shadow] duration-150
-        ${className}`}
+      className={cls}
     />
   );
 }

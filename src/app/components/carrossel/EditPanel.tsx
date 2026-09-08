@@ -489,9 +489,14 @@ function ToggleElemento({ label, dica, ativo, onChange }: { label: string; dica?
 }
 
 function CampoTexto({ label, valor, onChange, multiline, rows, maxLen, dica }: { label: string; valor: string; onChange: (v: string) => void; multiline?: boolean; rows?: number; maxLen?: number; dica?: string; }) {
+  // Shift+Enter quebra linha em qualquer campo; Enter puro não quebra nos de 1 linha.
+  const onKeyDown = (e: React.KeyboardEvent<any>) => {
+    if (e.key === "Enter" && !e.shiftKey && !multiline) e.preventDefault();
+  };
   const props = {
     value: valor,
     onChange: (e: React.ChangeEvent<any>) => onChange(e.target.value),
+    onKeyDown,
     maxLength: maxLen,
     className: "w-full bg-[#0f0f0f] border border-gray-800 rounded-md px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#FFC528] placeholder:text-gray-600 resize-none",
   };
@@ -501,7 +506,7 @@ function CampoTexto({ label, valor, onChange, multiline, rows, maxLen, dica }: {
         <label className="text-[11px] font-medium text-gray-400">{label}</label>
         {maxLen && (<span className={`text-[9px] ${valor.length > maxLen * 0.85 ? "text-[#FFC528]" : "text-gray-600"}`}>{valor.length}/{maxLen}</span>)}
       </div>
-      {multiline ? <textarea rows={rows || 3} {...props} /> : <input type="text" {...props} />}
+      {multiline ? <textarea rows={rows || 3} {...props} /> : <textarea rows={1} {...props} />}
       {dica && <p className="text-[10px] text-gray-600 mt-1">{dica}</p>}
     </div>
   );
