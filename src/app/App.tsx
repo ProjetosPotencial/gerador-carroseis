@@ -102,6 +102,30 @@ function AppShell() {
     document.title = "Gerador Potencial — Conteúdo LinkedIn & Instagram";
   }, []);
 
+  // Aviso ao atualizar/fechar a página se houver trabalho editado localmente,
+  // pra não perder os ajustes de diagramação sem salvar/baixar antes.
+  useEffect(() => {
+    const CHAVES = [
+      "parceleaqui:carrossel:slides:v1",
+      "parceleaqui:feed-stories:slides:v1",
+      "parceleaqui:semana-ig:v1",
+    ];
+    const handler = (e: BeforeUnloadEvent) => {
+      let temTrabalho = false;
+      for (const k of CHAVES) {
+        try {
+          if (localStorage.getItem(k)) { temTrabalho = true; break; }
+        } catch {}
+      }
+      if (temTrabalho) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
   const modoAtual = MODOS.find((m) => m.id === modo)!;
 
   return (

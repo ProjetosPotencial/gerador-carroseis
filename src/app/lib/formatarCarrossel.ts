@@ -1,6 +1,5 @@
 import type { SlideData, LayoutId } from "../components/CarrosselSlide";
 import type { TemaConfig } from "../components/temas/tipos";
-import { authHeaders } from "./supabaseClient";
 
 /**
  * Helpers para o fluxo "formatação via IA externa":
@@ -265,7 +264,7 @@ export async function chamarIADireto(opcoes: ChamarIAOpcoes): Promise<ChamarIARe
   try {
     resp = await fetch("/api/ia", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         prompt,
         model: opcoes.modelo,

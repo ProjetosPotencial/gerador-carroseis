@@ -1,17 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { CoresResolvidas, TemaConfig, SlideData, ConfigBaseElemento, ElementoTipo } from "./tipos";
 import { resolverFonteHeadline, resolverEstiloElemento, FONTE_FAMILIAS } from "./tipos";
-import { useAjuste, type CaixaLayout } from "./useAjuste";
-
-export type { CaixaLayout };
-
-/**
- * v7.28 — os primitivos de texto passaram a calcular o corpo da fonte em vez
- * de recebê-lo fixo. O `tamanho` que o layout informa virou TETO, não valor
- * absoluto: o motor mede o texto e desce até caber na caixa. Quando o
- * operador fixa `tamanhoPx` na mão, o motor sai da frente e respeita.
- * Passe `ajustar={false}` pra voltar ao comportamento antigo num caso pontual.
- */
 
 // ============================================================
 // PRIMITIVOS VISUAIS COMPARTILHADOS
@@ -69,26 +58,7 @@ export function Topbar({
 }
 
 /** Kicker pequeno em caixa alta com divisor colorido abaixo. */
-interface PropsKicker {
-  texto: string;
-  cor: string;
-  accent: string;
-  mostrarDivisor?: boolean;
-  slide?: SlideData;
-  tamanho?: number;
-  peso?: number;
-  tracking?: number;
-  caps?: boolean;
-  caixa?: CaixaLayout;
-  ajustar?: boolean;
-}
-
-export function Kicker(props: PropsKicker) {
-  if (!props.texto) return null;
-  return <KickerInterno {...props} />;
-}
-
-function KickerInterno({
+export function Kicker({
   texto,
   cor,
   accent,
@@ -98,9 +68,19 @@ function KickerInterno({
   peso = 800,
   tracking = 3,
   caps = true,
-  caixa,
-  ajustar = true,
-}: PropsKicker) {
+}: {
+  texto: string;
+  cor: string;
+  accent: string;
+  mostrarDivisor?: boolean;
+  slide?: SlideData;
+  tamanho?: number;
+  peso?: number;
+  tracking?: number;
+  caps?: boolean;
+}) {
+  if (!texto) return null;
+
   const estilo = slide
     ? resolverEstiloElemento(slide, "kicker", {
         tamanho,
@@ -116,32 +96,11 @@ function KickerInterno({
         textTransform: caps ? ("uppercase" as const) : ("none" as const),
       };
 
-  const fixadoNaMao = Boolean(slide?.tipoKicker?.tamanhoPx);
-  const { ref, fontSize } = useAjuste({
-    texto,
-    elemento: "kicker",
-    slideId: slide?.id,
-    estilo: {
-      fontFamily: estilo.fontFamily,
-      fontWeight: estilo.fontWeight,
-      letterSpacing: estilo.letterSpacing,
-      textTransform: estilo.textTransform,
-    },
-    tamanhoBase: estilo.fontSize,
-    lineHeight: 1.2,
-    preLine: false,
-    desativado: !ajustar || fixadoNaMao,
-    caixa,
-  });
-
   return (
     <>
       <div
-        ref={ref}
         style={{
           ...estilo,
-          fontSize,
-          lineHeight: 1.2,
           color: cor,
         }}
       >
@@ -162,34 +121,8 @@ function KickerInterno({
   );
 }
 
-interface PropsHeadline {
-  texto: string;
-  cor: string;
-  /** TETO do corpo da fonte. O motor desce a partir daqui até caber. */
-  tamanho?: number;
-  uppercase?: boolean;
-  fontFamily: string;
-  pesoHeadline?: number;
-  letterSpacing?: string;
-  lineHeight?: number;
-  italic?: boolean;
-  /** Se passado, aplica overrides de caps/escala/fonte/peso/tracking do slide */
-  slide?: SlideData;
-  /** Piso do corpo da fonte em px (garante legibilidade no feed) */
-  tamanhoMinimo?: number;
-  /** Caixa útil declarada pelo layout (altura e teto de linhas). */
-  caixa?: CaixaLayout;
-  /** false volta ao comportamento de corpo fixo da v7.27. */
-  ajustar?: boolean;
-}
-
-/** Headline grande. v7.28: o corpo da fonte é calculado, não constante. */
-export function Headline(props: PropsHeadline) {
-  if (!props.texto) return null;
-  return <HeadlineInterno {...props} />;
-}
-
-function HeadlineInterno({
+/** Headline grande (respeita fontFamily customizada + caps/escala/overrides do slide). */
+export function Headline({
   texto,
   cor,
   tamanho = 88,
@@ -201,64 +134,63 @@ function HeadlineInterno({
   italic = false,
   slide,
   tamanhoMinimo = 28,
-  caixa,
-  ajustar = true,
-}: PropsHeadline) {
+}: {
+  texto: string;
+  cor: string;
+  tamanho?: number;
+  uppercase?: boolean;
+  fontFamily: string;
+  pesoHeadline?: number;
+  letterSpacing?: string;
+  lineHeight?: number;
+  italic?: boolean;
+  /** Se passado, aplica overrides de caps/escala/fonte/peso/tracking do slide */
+  slide?: SlideData;
+  /** Tamanho mínimo em px (pra garantir legibilidade) */
+  tamanhoMinimo?: number;
+}) {
+  if (!texto) return null;
+
+  // Converte letterSpacing de string pra px (pra passar pro novo sistema)
   const trackingNumerico = parseLetterSpacing(letterSpacing);
 
-  // Estilo resolvido (overrides do slide quando existirem)
-  const estilo = slide
-    ? resolverEstiloElemento(slide, "headline", {
-        tamanho,
-        peso: pesoHeadline as any,
-        caps: uppercase,
-        tracking: trackingNumerico,
-      })
-    : {
-        fontSize: tamanho,
-        fontFamily,
-        fontWeight: pesoHeadline,
-        letterSpacing,
-        textTransform: (uppercase ? "uppercase" : "none") as any,
-      };
+  // Se tem slide, usa o resolvedor avançado (v7)
+  if (slide) {
+    const estilo = resolverEstiloElemento(slide, "headline", {
+      tamanho,
+      peso: pesoHeadline as any,
+      caps: uppercase,
+      tracking: trackingNumerico,
+    });
+    return (
+      <div
+        style={{
+          ...estilo,
+          fontFamily: estilo.fontFamily || fontFamily,
+          fontSize: Math.max(tamanhoMinimo, estilo.fontSize),
+          color: cor,
+          lineHeight,
+          whiteSpace: "pre-line",
+          fontStyle: italic ? "italic" : "normal",
+        }}
+      >
+        {texto}
+      </div>
+    );
+  }
 
-  const familia = slide ? estilo.fontFamily || fontFamily : fontFamily;
-  const teto = Math.max(tamanhoMinimo, estilo.fontSize);
-  // Operador fixou o tamanho na mão: respeita e não mexe.
-  const fixadoNaMao = Boolean(slide?.tipoHeadline?.tamanhoPx);
-
-  const { ref, fontSize } = useAjuste({
-    texto,
-    elemento: "headline",
-    slideId: slide?.id,
-    estilo: {
-      fontFamily: familia,
-      fontWeight: estilo.fontWeight,
-      letterSpacing: estilo.letterSpacing,
-      textTransform: estilo.textTransform,
-      fontStyle: italic ? "italic" : "normal",
-    },
-    tamanhoBase: teto,
-    lineHeight,
-    preLine: true,
-    desativado: !ajustar || fixadoNaMao,
-    caixa: {
-      ...caixa,
-      min: caixa?.min ?? Math.max(tamanhoMinimo, Math.round(teto * 0.45)),
-    },
-  });
-
+  // Modo legado (sem slide): comportamento da v6
   return (
     <div
-      ref={ref}
       style={{
-        ...estilo,
-        fontFamily: familia,
-        fontSize,
-        color: cor,
+        fontFamily,
+        fontSize: Math.max(tamanhoMinimo, tamanho),
+        fontWeight: pesoHeadline,
         lineHeight,
+        letterSpacing,
+        textTransform: uppercase ? "uppercase" : "none",
+        color: cor,
         whiteSpace: "pre-line",
-        textWrap: "balance" as any,
         fontStyle: italic ? "italic" : "normal",
       }}
     >
@@ -274,26 +206,8 @@ function parseLetterSpacing(ls: string): number {
   return 0;
 }
 
-interface PropsCorpo {
-  texto: string;
-  cor: string;
-  tamanho?: number;
-  fontFamily: string;
-  italic?: boolean;
-  maxWidth?: number;
-  slide?: SlideData;
-  peso?: number;
-  caixa?: CaixaLayout;
-  ajustar?: boolean;
-}
-
-/** Corpo de texto padrão. v7.28: com auto-ajuste. */
-export function Corpo(props: PropsCorpo) {
-  if (!props.texto) return null;
-  return <CorpoInterno {...props} />;
-}
-
-function CorpoInterno({
+/** Corpo de texto padrão. */
+export function Corpo({
   texto,
   cor,
   tamanho = 24,
@@ -302,9 +216,18 @@ function CorpoInterno({
   maxWidth,
   slide,
   peso = 400,
-  caixa,
-  ajustar = true,
-}: PropsCorpo) {
+}: {
+  texto: string;
+  cor: string;
+  tamanho?: number;
+  fontFamily: string;
+  italic?: boolean;
+  maxWidth?: number;
+  slide?: SlideData;
+  peso?: number;
+}) {
+  if (!texto) return null;
+
   const estilo = slide
     ? resolverEstiloElemento(slide, "corpo", {
         tamanho,
@@ -319,36 +242,13 @@ function CorpoInterno({
         textTransform: "none" as const,
       };
 
-  const familia = slide?.tipoCorpo?.fonte ? estilo.fontFamily : fontFamily;
-  const fixadoNaMao = Boolean(slide?.tipoCorpo?.tamanhoPx);
-  const lineHeight = 1.45;
-
-  const { ref, fontSize } = useAjuste({
-    texto,
-    elemento: "corpo",
-    slideId: slide?.id,
-    estilo: {
-      fontFamily: familia,
-      fontWeight: estilo.fontWeight,
-      letterSpacing: estilo.letterSpacing,
-      textTransform: estilo.textTransform,
-      fontStyle: italic ? "italic" : "normal",
-    },
-    tamanhoBase: estilo.fontSize,
-    lineHeight,
-    preLine: true,
-    desativado: !ajustar || fixadoNaMao,
-    caixa: { largura: maxWidth, ...caixa },
-  });
-
   return (
     <div
-      ref={ref}
       style={{
         ...estilo,
-        fontFamily: familia,
-        fontSize,
-        lineHeight,
+        // Se o slide override mudou a fonte, respeita; senão usa a fontFamily passada
+        fontFamily: slide?.tipoCorpo?.fonte ? estilo.fontFamily : fontFamily,
+        lineHeight: 1.45,
         color: cor,
         whiteSpace: "pre-line",
         fontStyle: italic ? "italic" : "normal",
@@ -360,33 +260,24 @@ function CorpoInterno({
   );
 }
 
-interface PropsDestaque {
-  texto: string;
-  cor: string;
-  fontFamily: string;
-  tamanho?: number;
-  slide?: SlideData;
-  peso?: number;
-  caixa?: CaixaLayout;
-  ajustar?: boolean;
-}
-
-/** Frase de destaque em bold colorido. v7.28: com auto-ajuste. */
-export function Destaque(props: PropsDestaque) {
-  if (!props.texto) return null;
-  return <DestaqueInterno {...props} />;
-}
-
-function DestaqueInterno({
+/** Frase de destaque em bold colorido. */
+export function Destaque({
   texto,
   cor,
   fontFamily,
   tamanho = 26,
   slide,
   peso = 900,
-  caixa,
-  ajustar = true,
-}: PropsDestaque) {
+}: {
+  texto: string;
+  cor: string;
+  fontFamily: string;
+  tamanho?: number;
+  slide?: SlideData;
+  peso?: number;
+}) {
+  if (!texto) return null;
+
   const estilo = slide
     ? resolverEstiloElemento(slide, "destaque", {
         tamanho,
@@ -401,37 +292,13 @@ function DestaqueInterno({
         textTransform: "none" as const,
       };
 
-  const familia = slide?.tipoDestaque?.fonte ? estilo.fontFamily : fontFamily;
-  const fixadoNaMao = Boolean(slide?.tipoDestaque?.tamanhoPx);
-  const lineHeight = 1.35;
-
-  const { ref, fontSize } = useAjuste({
-    texto,
-    elemento: "destaque",
-    slideId: slide?.id,
-    estilo: {
-      fontFamily: familia,
-      fontWeight: estilo.fontWeight,
-      letterSpacing: estilo.letterSpacing,
-      textTransform: estilo.textTransform,
-    },
-    tamanhoBase: estilo.fontSize,
-    lineHeight,
-    preLine: true,
-    desativado: !ajustar || fixadoNaMao,
-    caixa,
-  });
-
   return (
     <div
-      ref={ref}
       style={{
         ...estilo,
-        fontFamily: familia,
-        fontSize,
-        lineHeight,
+        fontFamily: slide?.tipoDestaque?.fonte ? estilo.fontFamily : fontFamily,
+        lineHeight: 1.35,
         color: cor,
-        textWrap: "balance" as any,
       }}
     >
       {texto}
@@ -765,85 +632,4 @@ export function containerArredondado(raio: number, fundo: string): React.CSSProp
     borderRadius: raio,
     overflow: "hidden",
   };
-}
-
-// ============================================================
-// AUTOFIT — v7.28
-// ============================================================
-/**
- * Envelope de auto-ajuste para os temas que montam a tipografia inline com
- * `aplicarTipoElemento` (tweet, keynote, editorial) em vez de usar os
- * primitivos Headline/Corpo/Destaque/Kicker.
- *
- * Migração de um bloco: envolva a div existente, sem mexer no conteúdo dela.
- *
- *   <AutoFit slide={slide} elemento="headline" maxLinhas={4} alturaMax={300}>
- *     <div style={{ ...aplicarTipoElemento(slide, "headline", { tamanho: 100 }), color: CORES.creme }}>
- *       {slide.headline}
- *     </div>
- *   </AutoFit>
- *
- * O `fontSize` que já está no style da div vira o TETO. O motor mede o texto
- * e desce a partir dele até caber. Nada mais muda no layout.
- */
-export function AutoFit({
-  children,
-  slide,
-  elemento,
-  maxLinhas,
-  alturaMax,
-  min,
-  largura,
-  ajustar = true,
-}: {
-  children: React.ReactElement;
-  slide?: SlideData;
-  elemento: "kicker" | "headline" | "corpo" | "destaque" | "pill" | "numero";
-  maxLinhas?: number;
-  alturaMax?: number;
-  min?: number;
-  largura?: number;
-  ajustar?: boolean;
-}) {
-  const filho = React.Children.only(children) as React.ReactElement<any>;
-  const estiloFilho = (filho.props?.style || {}) as React.CSSProperties;
-
-  const texto = typeof filho.props?.children === "string" ? filho.props.children : "";
-  const teto = Number(estiloFilho.fontSize) || 0;
-  const lineHeight = Number(estiloFilho.lineHeight) || 1.2;
-  const preLine = estiloFilho.whiteSpace === "pre-line";
-
-  const campoOverride = {
-    kicker: "tipoKicker",
-    headline: "tipoHeadline",
-    corpo: "tipoCorpo",
-    destaque: "tipoDestaque",
-    pill: "tipoPill",
-    numero: "tipoNumero",
-  }[elemento] as keyof SlideData;
-  const fixadoNaMao = Boolean((slide?.[campoOverride] as any)?.tamanhoPx);
-
-  const { ref, fontSize } = useAjuste({
-    texto,
-    elemento,
-    slideId: slide?.id,
-    estilo: {
-      fontFamily: String(estiloFilho.fontFamily || "inherit"),
-      fontWeight: (estiloFilho.fontWeight as any) ?? 400,
-      letterSpacing: String(estiloFilho.letterSpacing ?? "normal"),
-      textTransform: String(estiloFilho.textTransform ?? "none"),
-      fontStyle: String(estiloFilho.fontStyle ?? "normal"),
-    },
-    tamanhoBase: teto,
-    lineHeight,
-    preLine,
-    // Sem texto simples ou sem tamanho declarado não há o que ajustar.
-    desativado: !ajustar || fixadoNaMao || !texto || teto <= 0,
-    caixa: { largura, alturaMax, maxLinhas, min },
-  });
-
-  return React.cloneElement(filho, {
-    ref,
-    style: { ...estiloFilho, fontSize: fontSize || estiloFilho.fontSize },
-  });
 }

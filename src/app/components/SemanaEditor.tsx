@@ -228,6 +228,10 @@ export default function SemanaEditor({
 
   const [carregando, setCarregando] = useState(false);
   const carregarDoServidor = async () => {
+    const ok = window.confirm(
+      "Carregar do servidor vai SUBSTITUIR as peças atuais e você pode PERDER os ajustes de diagramação que fez até agora.\n\nSe precisar, cancele e baixe/salve as artes editadas antes de continuar.\n\nCarregar mesmo assim?"
+    );
+    if (!ok) return;
     setCarregando(true);
     setAviso("");
     try { localStorage.removeItem(EDIT_KEY); } catch {}
