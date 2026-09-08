@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "functions": {
+    "api/imagem.ts": {
+      "maxDuration": 60
+    },
+    "api/produzir-semana.ts": {
+      "maxDuration": 60
+    },
+    "api/slides/finalizar.ts": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/produzir-semana",
+      "schedule": "0 11 * * 5"
+    }
+  ]
+}

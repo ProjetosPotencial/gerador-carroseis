@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="theme-color" content="#FFC528" />
+
+    <!-- Fonte Kufam local (v7.7 - módulo Feed/Stories Parcele Aqui)
+         WOFF2 servida de /fonts/kufam/ - garante render igual ao Figma e funciona offline -->
+    <style>
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 400;
+        font-style: normal;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-Regular.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 400;
+        font-style: italic;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-Italic.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 500;
+        font-style: normal;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-Medium.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 500;
+        font-style: italic;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-MediumItalic.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 600;
+        font-style: normal;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-SemiBold.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 600;
+        font-style: italic;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-SemiBoldItalic.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 700;
+        font-style: normal;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-Bold.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 700;
+        font-style: italic;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-BoldItalic.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 900;
+        font-style: normal;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-Black.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Kufam";
+        font-weight: 900;
+        font-style: italic;
+        font-display: block;
+        src: url("/fonts/kufam/Kufam-BlackItalic.woff2") format("woff2");
+      }
+    </style>
+
+    <!-- SEO / social -->
+    <title>Gerador de Capas · Parcele News</title>
+    <meta
+      name="description"
+      content="Gerador de capas do LinkedIn para a Parcele News — Parcele Aqui. Cria capas individuais ou em lote com download em ZIP."
+    />
+    <meta property="og:title" content="Gerador de Capas · Parcele News" />
+    <meta
+      property="og:description"
+      content="Ferramenta interna para gerar capas do LinkedIn da Parcele News."
+    />
+    <meta property="og:type" content="website" />
+
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      #root {
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
