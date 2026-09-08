@@ -127,7 +127,15 @@ export default function CarrosselEditor() {
       .replace(/^-+|-+$/g, "")
       .slice(0, 40);
   const nomeArquivoZip = useMemo(() => {
-    // Bloco 5: nomeia por ${mes}-${semana}-${peca} quando o Banco está preenchido.
+    // Item 2: se a peça veio da aba Semana, usa o nome canônico pelo slug.
+    try {
+      const raw = localStorage.getItem("parceleaqui:export-meta:v1");
+      if (raw) {
+        const m = JSON.parse(raw);
+        if (m && m.nomeBase && m.tipo === "carrossel" && !m.ehStory) return m.nomeBase;
+      }
+    } catch {}
+    // Fallback: nomeia por ${mes}-${semana}-${peca} quando o Banco está preenchido.
     const partes = [img.banco.mes, img.banco.semana, img.banco.peca].map(slug).filter(Boolean);
     if (partes.length) return partes.join("-");
     const primeira = sl.slides[0]?.headline || "carrossel";

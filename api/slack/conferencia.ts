@@ -14,6 +14,12 @@ async function verificarAcesso(
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !key) return { ok: true }; // sem supabase não dá pra validar
 
+  // v7.28: aceita a chave do app (gate por senha) como alternativa ao token
+  // Supabase, que deixou de existir no cliente. Fecha p/ requisições sem a chave.
+  const appKeyEsperada = process.env.APP_ACCESS_KEY || "Potencial@2026";
+  const appKey = req.headers.get("x-app-key") || "";
+  if (appKey && appKey === appKeyEsperada) return { ok: true };
+
   const auth = req.headers.get("authorization") || "";
   const token = /^bearer\s+/i.test(auth) ? auth.replace(/^bearer\s+/i, "").trim() : "";
   if (!token) return { ok: false, status: 401, erro: "Não autenticado." };

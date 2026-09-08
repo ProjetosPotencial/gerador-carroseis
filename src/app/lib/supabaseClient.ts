@@ -27,8 +27,14 @@ export async function getAccessToken(): Promise<string | null> {
   }
 }
 
-/** Cabeçalho Authorization pras chamadas /api/* (vazio se não houver sessão). */
+/** Chave do app (gate por senha) enviada às rotas /api/* como x-app-key.
+ * Igual à senha do AuthGate; trocável por VITE_APP_SENHA no build. */
+const APP_KEY = (((import.meta as any).env?.VITE_APP_SENHA as string) || "Potencial@2026").trim();
+
+/** Cabeçalhos pras chamadas /api/*: x-app-key (sempre) + Bearer (se houver sessão). */
 export async function authHeaders(): Promise<Record<string, string>> {
   const t = await getAccessToken();
-  return t ? { Authorization: "Bearer " + t } : {};
+  const h: Record<string, string> = { "x-app-key": APP_KEY };
+  if (t) h.Authorization = "Bearer " + t;
+  return h;
 }

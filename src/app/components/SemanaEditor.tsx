@@ -36,6 +36,15 @@ function linhaSalva(): Linha {
 const KEY_CARROSSEL = "parceleaqui:carrossel:slides:v1";
 const KEY_FEED = "parceleaqui:feed-stories:slides:v1";
 const EDIT_KEY = "parceleaqui:semana-ig:editando";
+const EXPORT_META = "parceleaqui:export-meta:v1"; // nome canônico do ZIP p/ os editores (item 2)
+const META_BASE = "parceleaqui:semana-ig:meta:v1"; // identidade da semana (mes/semana/slug)
+const chaveMeta = (l: Linha) => (l === "parcele" ? META_BASE : META_BASE + ":" + l);
+const linhaSlug = (l: Linha) => (l === "parcele" ? "pa" : "gp");
+interface SemanaMeta { mes?: string; semana?: string; slug?: string; }
+function carregarMeta(l: Linha): SemanaMeta {
+  try { const raw = localStorage.getItem(chaveMeta(l)); if (raw) return JSON.parse(raw) || {}; } catch {}
+  return {};
+}
 
 type PecaTipo = "carrossel" | "feed";
 interface PecaSemana {
@@ -103,6 +112,11 @@ export default function SemanaEditor({
   const [colaAberta, setColaAberta] = useState(false);
   const [texto, setTexto] = useState("");
   const [aviso, setAviso] = useState<string>("");
+  const [meta, setMeta] = useState<SemanaMeta>(() => carregarMeta(linhaSalva()));
+
+  useEffect(() => {
+    try { localStorage.setItem(chaveMeta(linha), JSON.stringify(meta)); } catch {}
+  }, [meta, linha]);
 
   useEffect(() => {
     try {
@@ -118,8 +132,10 @@ export default function SemanaEditor({
       localStorage.setItem(KEY_LINHA, nova);
       localStorage.removeItem(EDIT_KEY);
     } catch {}
+    try { localStorage.removeItem(EXPORT_META); } catch {}
     setLinha(nova);
     setPecas(carregar(nova));
+    setMeta(carregarMeta(nova));
     setAviso("Linha: " + (LINHAS.find((l) => l.id === nova)?.rotulo || nova) + ". Clique em Carregar do servidor para trazer a semana publicada.");
     setTimeout(() => setAviso(""), 7000);
   };
@@ -131,7 +147,7 @@ export default function SemanaEditor({
     setPecas((lista) => lista.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
   const aplicarCola = () => {
-    try { localStorage.removeItem(EDIT_KEY); } catch {}
+    try { localStorage.removeItem(EDIT_KEY); localStorage.removeItem(EXPORT_META); } catch {}
     const { carrossel, feed } = distribuirSemana(texto);
     setPecas((lista) => {
       const cs = lista.filter((p) => p.tipo === "carrossel");
@@ -197,15 +213,28 @@ export default function SemanaEditor({
   const abrirStory = (p: PecaSemana) => {
     try {
       sincronizarMarcador();
+      escreverExportMeta(p, true);
       localStorage.setItem(KEY_FEED, JSON.stringify(montarStory(p)));
       localStorage.setItem(EDIT_KEY, JSON.stringify({ id: p.id, tipo: "story", ts: Date.now() }));
     } catch {}
     onAbrirEditor?.("feed");
   };
 
+  const escreverExportMeta = (p: PecaSemana, ehStory: boolean) => {
+    try {
+      if (!meta.slug) { localStorage.removeItem(EXPORT_META); return; }
+      const idx = pecas.findIndex((x) => x.id === p.id);
+      const n = idx >= 0 ? idx + 1 : 1; // número da peça = dia da semana (seg=1..sex=5)
+      const tipo = ehStory ? "carrossel" : p.tipo;
+      const nomeBase = `${meta.slug}-${linhaSlug(linha)}-${tipo}-peca-${n}${ehStory ? "-story" : ""}`;
+      localStorage.setItem(EXPORT_META, JSON.stringify({ nomeBase, slug: meta.slug, linha: linhaSlug(linha), tipo, peca: n, ehStory }));
+    } catch {}
+  };
+
   const abrir = (p: PecaSemana) => {
     try {
       sincronizarMarcador();
+      escreverExportMeta(p, false);
       localStorage.setItem(chaveDoTipo(p.tipo), JSON.stringify(comId(p.slides)));
       localStorage.setItem(EDIT_KEY, JSON.stringify({ id: p.id, tipo: p.tipo, ts: Date.now() }));
     } catch {}
@@ -234,7 +263,7 @@ export default function SemanaEditor({
     if (!ok) return;
     setCarregando(true);
     setAviso("");
-    try { localStorage.removeItem(EDIT_KEY); } catch {}
+    try { localStorage.removeItem(EDIT_KEY); localStorage.removeItem(EXPORT_META); } catch {}
     try {
       const r = await fetch(URLS_SEMANA[linha] + "?t=" + Date.now());
       if (!r.ok) throw new Error("HTTP " + r.status);
@@ -242,21 +271,25 @@ export default function SemanaEditor({
       const remotas: any[] = Array.isArray(data) ? data : data.pecas || [];
       const cs = remotas.filter((p) => p.tipo === "carrossel");
       const fs = remotas.filter((p) => p.tipo === "feed");
-      setPecas((lista) => {
-        const locC = lista.filter((p) => p.tipo === "carrossel");
-        const locF = lista.filter((p) => p.tipo === "feed");
-        return lista.map((p) => {
-          if (p.tipo === "carrossel") {
-            const i = locC.indexOf(p);
-            if (cs[i]) return { ...p, titulo: cs[i].titulo || p.titulo, slides: formatarCarrossel(cs[i].slides || []) };
-          } else {
-            const i = locF.indexOf(p);
-            if (fs[i]) return { ...p, titulo: fs[i].titulo || p.titulo, slides: fs[i].slides || [] };
-          }
-          return p;
-        });
+      // Item 1: SUBSTITUI a semana inteira. Reconstrói a partir do PADRAO (vazio)
+      // e preenche por tipo/ordem; slots sem peça no servidor ficam VAZIOS.
+      // Antes fazia merge posicional e deixava peça fantasma da semana anterior.
+      let ci = 0, fi = 0;
+      const novas: PecaSemana[] = PADRAO.map((base) => {
+        if (base.tipo === "carrossel") {
+          const rp = cs[ci++];
+          return rp
+            ? { ...base, titulo: rp.titulo || base.titulo, slides: formatarCarrossel(rp.slides || []), story: undefined }
+            : { ...base, slides: [], story: undefined };
+        }
+        const rp = fs[fi++];
+        return rp
+          ? { ...base, titulo: rp.titulo || base.titulo, slides: rp.slides || [], story: undefined }
+          : { ...base, slides: [], story: undefined };
       });
-      setAviso(`Semana carregada do servidor: ${cs.length} carrossel(eis) e ${fs.length} feed(s).`);
+      setPecas(novas);
+      setMeta({ mes: data.mes, semana: data.semana, slug: data.slug });
+      setAviso(`Semana carregada do servidor: ${cs.length} carrossel(eis) e ${fs.length} feed(s).` + (data.slug ? ` (${data.semana || data.slug})` : ""));
     } catch (e: any) {
       setAviso("Nao consegui carregar do servidor (" + (e?.message || "erro") + "). Ainda nao ha semana publicada?");
     } finally {

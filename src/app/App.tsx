@@ -22,6 +22,7 @@ import { ThemeProvider, useTheme } from "./lib/ThemeProvider";
 import { SPACING, RADIUS, FONT_WEIGHT, FONT_SIZE, TRANSITION, SHADOW } from "./lib/designSystem";
 import { Badge } from "./components/ui-premium";
 import AuthGate from "./components/AuthGate";
+import { preaquecerFontes } from "./lib/gerarCarrossel";
 import RenderView from "./components/RenderView";
 
 type Modo = "editor" | "lote" | "carrossel" | "feed" | "semana";
@@ -100,6 +101,7 @@ function AppShell() {
 
   useEffect(() => {
     document.title = "Gerador Potencial — Conteúdo LinkedIn & Instagram";
+    preaquecerFontes(); // item 3: embute as fontes cedo p/ o 1º export não refluir
   }, []);
 
   // Aviso ao atualizar/fechar a página se houver trabalho editado localmente,

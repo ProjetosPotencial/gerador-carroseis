@@ -21,16 +21,30 @@ import JSZip from "jszip";
 // cai pra "" (fontes já carregadas na página são usadas na rasterização).
 let _fontCssCache: string | null = null;
 export async function fontCssUmaVez(): Promise<string> {
-  if (_fontCssCache !== null) return _fontCssCache;
+  // Só cacheia resultado NÃO-vazio. Antes, um timeout cacheava "" e envenenava
+  // TODOS os exports seguintes (fonte não embutida -> reflow no PNG). Item 3.
+  if (_fontCssCache) return _fontCssCache;
   try {
-    _fontCssCache = await Promise.race([
+    const css = await Promise.race([
       getFontEmbedCSS(document.body),
-      new Promise<string>((_, rej) => setTimeout(() => rej(new Error("timeout")), 20000)),
+      new Promise<string>((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000)),
     ]);
+    if (css) _fontCssCache = css;
+    return css || "";
   } catch {
-    _fontCssCache = "";
+    return ""; // não cacheia a falha; tenta de novo no próximo export
   }
-  return _fontCssCache;
+}
+
+/** Pré-aquece o CSS das fontes (chamar no load do app) pra 1º export não esperar. */
+export function preaquecerFontes(): void {
+  try {
+    if (document.fonts && (document.fonts as any).ready) {
+      (document.fonts as any).ready.then(() => { fontCssUmaVez().catch(() => {}); });
+    } else {
+      fontCssUmaVez().catch(() => {});
+    }
+  } catch {}
 }
 
 /** Pré-carrega uma imagem forçando CORS anônimo. */
@@ -124,11 +138,16 @@ function dataUrlToBlob(dataUrl: string): Blob {
 export interface SlideRef {
   index: number;
   element: HTMLDivElement;
+  /** Nome canônico do arquivo no ZIP (ex.: slide-1.png, feed.png). */
+  nome?: string;
 }
 
 export interface GerarCarrosselOpcoes {
   slides: SlideRef[];
   nomeBase: string;
+  /** Se true (default), os PNG ficam na RAIZ do ZIP (sem pasta), pra
+   * descompactar direto na pasta da peça. Item 5. */
+  semPasta?: boolean;
   onProgress?: (atual: number, total: number) => void;
   onSuccess?: () => void;
   onError?: (err: Error) => void;
@@ -161,15 +180,16 @@ export async function baixarSlideUnico(
  * Gera todos os slides, empacota num ZIP e dispara download.
  */
 export async function baixarCarrosselZIP(opcoes: GerarCarrosselOpcoes): Promise<boolean> {
-  const { slides, nomeBase, onProgress, onSuccess, onError } = opcoes;
+  const { slides, nomeBase, semPasta = true, onProgress, onSuccess, onError } = opcoes;
 
   try {
     const zip = new JSZip();
-    const pasta = zip.folder(nomeBase);
-    if (!pasta) throw new Error("Falha ao criar pasta no ZIP.");
+    const destino = semPasta ? zip : zip.folder(nomeBase);
+    if (!destino) throw new Error("Falha ao criar o ZIP.");
+    const usados = new Set<string>();
 
     for (let i = 0; i < slides.length; i++) {
-      const { index, element } = slides[i];
+      const { index, element, nome } = slides[i];
       onProgress?.(i + 1, slides.length);
 
       // v7.20.3: isola o slide da captura (esconde os outros) p/ toPng rápido.
@@ -181,8 +201,14 @@ export async function baixarCarrosselZIP(opcoes: GerarCarrosselOpcoes): Promise<
         slides.forEach((sl) => { sl.element.style.display = ""; });
       }
       const blob = dataUrlToBlob(dataUrl);
-      const nomeSlide = `slide-${index + 1}.png`;
-      pasta.file(nomeSlide, blob);
+      // Nome canônico (item 5): usa o nome pedido; se repetir, sufixa; default slide-N.png
+      let nomeSlide = nome || `slide-${index + 1}.png`;
+      if (usados.has(nomeSlide)) {
+        const base = nomeSlide.replace(/\.png$/i, "");
+        nomeSlide = `${base}-${i + 1}.png`;
+      }
+      usados.add(nomeSlide);
+      destino.file(nomeSlide, blob);
     }
 
     // Gera e baixa o ZIP

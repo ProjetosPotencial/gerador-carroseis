@@ -94,6 +94,9 @@ async function verificarAcessoLocal(
   // v7.20.6: automação (produzir-semana / render headless) autentica com CRON_SECRET
   const cron = (process.env.CRON_SECRET || "").trim();
   if (cron && token === cron) return { ok: true };
+  const appKeyEsperada = process.env.APP_ACCESS_KEY || "Potencial@2026";
+  const appKey = req.headers.get("x-app-key") || "";
+  if (appKey && appKey === appKeyEsperada) return { ok: true };
   if (!token) return { ok: false, status: 401, erro: "Não autenticado." };
   try {
     const r = await fetch(base.replace(/\/+$/, "") + "/auth/v1/user", {

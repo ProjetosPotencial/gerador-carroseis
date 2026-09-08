@@ -303,24 +303,36 @@ export default function FeedEditor() {
       console.warn(`Pulando ${nPulados} slides com templates ainda não implementados.`);
     }
 
+    // Item 5: nomes canônicos de arquivo pra descompactar direto na pasta da peça.
+    const nomeCanonico = (templateId: string) =>
+      /chamada/.test(templateId) ? "stories-chamada.png"
+        : templateId.startsWith("stories") ? "stories.png"
+        : "feed.png";
     const slideRefsArr = slidesValidos
       .map(({ slide, idx }) => {
         const el = slideRefs.current.get(slide.id);
         if (!el) return null;
-        return { index: idx, element: el };
+        return { index: idx, element: el, nome: nomeCanonico(slide.templateId) };
       })
-      .filter((x): x is { index: number; element: HTMLDivElement } => x !== null);
+      .filter((x): x is { index: number; element: HTMLDivElement; nome: string } => x !== null);
 
     if (slideRefsArr.length === 0) {
       setStatus({ tipo: "erro", msg: "Erro: refs não montados." });
       return;
     }
 
-    setStatus({ tipo: "exportando", atual: 0, total: slideRefsArr.length });
+    // Item 2: nome do ZIP pelo slug da semana, quando a peça veio da aba Semana.
     const dataIso = new Date().toISOString().slice(0, 10);
+    let nomeBase = `parceleaqui-feed-${dataIso}`;
+    try {
+      const raw = localStorage.getItem("parceleaqui:export-meta:v1");
+      if (raw) { const m = JSON.parse(raw); if (m && m.nomeBase) nomeBase = m.nomeBase; }
+    } catch {}
+
+    setStatus({ tipo: "exportando", atual: 0, total: slideRefsArr.length });
     const ok = await baixarCarrosselZIP({
       slides: slideRefsArr,
-      nomeBase: `parceleaqui-feed-${dataIso}`,
+      nomeBase,
       onProgress: (atual, total) =>
         setStatus({ tipo: "exportando", atual, total }),
     });
